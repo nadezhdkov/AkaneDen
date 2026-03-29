@@ -48,11 +48,25 @@ class EventBus:
                 cb for cb in self._listeners[event] if cb != callback
             ]
 
-    async def emit(self, event: str, data: dict | None = None) -> None:
+    async def emit(
+        self,
+        event: str,
+        data: dict | None = None,
+        *,
+        fire_and_forget: bool = False,
+    ) -> None:
         """Emite um evento para todos os listeners registrados.
 
         Suporta callbacks sync e async. Erros em um listener não
         bloqueiam os demais.
+
+        Args:
+            event: Nome do evento.
+            data: Dados do evento.
+            fire_and_forget: Se True, listeners assíncronos são lançados
+                via asyncio.create_task() sem bloquear o emit().
+                Use para pipelines pesados (Brain/TTS) que não devem
+                congelar o event loop.
         """
         listeners = self._listeners.get(event, [])
         if not listeners:
@@ -63,18 +77,39 @@ class EventBus:
             "data": data,
             "listeners": len(listeners),
         })
-        logger.debug(f"Evento emitido: '{event}' -> {len(listeners)} listener(s)")
+        logger.debug(
+            f"Evento emitido: '{event}' -> {len(listeners)} listener(s)"
+            f"{' [fire_and_forget]' if fire_and_forget else ''}"
+        )
 
         for cb in listeners:
             try:
                 if asyncio.iscoroutinefunction(cb):
-                    await cb(data)
+                    if fire_and_forget:
+                        asyncio.create_task(
+                            self._safe_invoke(cb, data, event)
+                        )
+                    else:
+                        await cb(data)
                 else:
                     cb(data)
             except Exception as e:
                 logger.error(
                     f"Erro no listener de '{event}' ({cb.__qualname__}): {e}"
                 )
+
+    @staticmethod
+    async def _safe_invoke(
+        cb: Callable, data: dict | None, event: str
+    ) -> None:
+        """Wrapper seguro para tasks fire-and-forget — captura exceções."""
+        try:
+            await cb(data)
+        except Exception as e:
+            logger.error(
+                f"Erro em task fire_and_forget de '{event}' "
+                f"({cb.__qualname__}): {e}"
+            )
 
     def has_listeners(self, event: str) -> bool:
         """Verifica se há listeners para um evento."""

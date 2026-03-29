@@ -54,18 +54,31 @@ class ExpressionSkill(BaseSkill):
             await self._vts.request_authenticate()
             self._connected = True
 
-            # Autodiscovery de Hotkeys
-            hotkeys_req = self._vts.vts_request.requestHotkeys()
-            response = await self._vts.request(hotkeys_req)
-            
-            # Indexar as hotkeys reais disponíveis no modelo
-            if "data" in response and "availableHotkeys" in response["data"]:
-                for hk in response["data"]["availableHotkeys"]:
-                    self._vts_hotkeys[hk["name"]] = hk["name"]
-            
-            logger.info(f"VTube Studio: {len(self._vts_hotkeys)} hotkeys encontradas.")
+            # Autodiscovery de Hotkeys (resiliente)
+            try:
+                hotkeys_req = self._vts.vts_request.requestHotkeys()
+                response = await self._vts.request(hotkeys_req)
 
-            # Registra listener para emoções
+                # Indexar as hotkeys reais disponíveis no modelo
+                if "data" in response and "availableHotkeys" in response["data"]:
+                    for hk in response["data"]["availableHotkeys"]:
+                        self._vts_hotkeys[hk["name"]] = hk["name"]
+
+                logger.info(
+                    f"VTube Studio: {len(self._vts_hotkeys)} hotkeys encontradas."
+                )
+            except AttributeError as e:
+                logger.warning(
+                    f"API de hotkeys indisponível nesta versão do pyvts ({e}). "
+                    f"Expressões via hotkey desabilitadas."
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Falha ao carregar hotkeys do VTube Studio: {e}. "
+                    f"Expressões podem não funcionar."
+                )
+
+            # Registra listener para emoções (mesmo sem hotkeys, para log)
             self.event_bus.on("emotion_detected", self._on_emotion)
 
             logger.info("ExpressionSkill conectada ao VTube Studio.")

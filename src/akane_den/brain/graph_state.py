@@ -21,7 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from loguru import logger
 
 from akane_den.brain.emotion_analyzer import EmotionAnalyzer
-from akane_den.brain.persona import get_akane_system_prompt
+from akane_den.brain.persona import get_system_prompt
 
 if TYPE_CHECKING:
     from akane_den.core.service_context import ServiceContext
@@ -37,7 +37,7 @@ class AkaneBrain:
     def __init__(self, service: "ServiceContext") -> None:
         self.service = service
         self._history: list = []
-        self._emotion_analyzer = EmotionAnalyzer()
+        self._emotion_analyzer = EmotionAnalyzer(service.persona)
         self._tools: list = []
         self._memory = None
 
@@ -85,7 +85,8 @@ class AkaneBrain:
                 + "\n".join(f"- {m}" for m in memory_context)
             )
 
-        system_prompt = get_akane_system_prompt(
+        system_prompt = get_system_prompt(
+            profile=self.service.persona,
             vision_context=vision_context,
             webcam_context=webcam_context,
             barge_in=barge_in,

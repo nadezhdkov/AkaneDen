@@ -11,6 +11,7 @@ akane:
   # --- Input Mode ---
   ptt_key: "f2"           # Tecla push-to-talk (customizável)
   input_mode: "ptt"       # "ptt" (primário) ou "vad" (fallback)
+  persona: "akane_default" # YAML de Perfil de Personagem
 
   # --- Speech-to-Text (ASR) ---
   asr:
@@ -46,13 +47,6 @@ akane:
     lip_sync: true
     lip_sensitivity: 1.5
     lip_smoothing: 0.4
-    emotion_map:
-      alegria: "星星眼"
-      raiva: "阴险启用"
-      surpresa: "惊讶"
-      tedio: "白眼"
-      vergonha: "害羞"
-      neutro: "眼睛恢复"
 
   # --- Cérebro (LLM) ---
   brain:

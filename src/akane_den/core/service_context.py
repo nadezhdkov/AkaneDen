@@ -28,6 +28,8 @@ from akane_den.core.engines.asr_engine import ASREngine
 from akane_den.core.engines.llm_engine import LLMEngine
 from akane_den.core.engines.tts_engine import TTSEngine, ElevenLabsTTSEngine
 from akane_den.core.event_bus import EventBus
+from akane_den.core.persona_manager import PersonaManager
+from akane_den.core.models.persona import PersonaProfile
 
 
 @dataclass
@@ -51,6 +53,7 @@ class ServiceContext:
     llm: LLMEngine
     tts: TTSEngine
     asr: ASREngine
+    persona: PersonaProfile
     # Motor TTS emocional (ElevenLabs) — pode ser None
     tts_emotional: ElevenLabsTTSEngine | None = None
 
@@ -72,6 +75,16 @@ class ServiceContext:
         logger.info("=" * 50)
 
         event_bus = EventBus()
+        
+        # ── Persona Load & Override ──
+        pm = PersonaManager()
+        profile = pm.load_persona(config.persona)
+        
+        # Sobrescreve as configs de voz dinamicamente pelo que estiver no profile
+        if profile.voice_config.elevenlabs_voice_id:
+            config.tts.elevenlabs_voice_id = profile.voice_config.elevenlabs_voice_id
+        if profile.voice_config.edge_voice:
+            config.tts.edge_voice = profile.voice_config.edge_voice
 
         # ── LLM Engine ──
         llm = EngineFactory.create_llm(config)
@@ -103,6 +116,7 @@ class ServiceContext:
             llm=llm,
             tts=tts,
             asr=asr,
+            persona=profile,
             tts_emotional=tts_emotional,
         )
 

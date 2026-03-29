@@ -1,20 +1,24 @@
 """
-EmotionAnalyzer — Análise de emoções baseada em padrões textuais.
+EmotionAnalyzer — Análise de emoções baseada em padrões textuais da Persona.
 
-Detecta emoções no texto da Akane para:
+Detecta emoções no texto para:
 1. Selecionar expressões faciais no VTube Studio
-2. Escolher motor TTS adequado (Edge vs ElevenLabs)
+2. Escolher motor TTS adequado
 3. Ajustar parâmetros de lip sync
 
-Migrado para loguru na v3.0.
+Compila os padrões Regex carregados da `PersonaProfile` em runtime.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from akane_den.core.models.persona import PersonaProfile
 
 
 @dataclass
@@ -25,51 +29,28 @@ class EmotionResult:
     triggers: list[str]
 
 
-# ──────────────────────────────────────────────
-# Padrões emocionais
-# ──────────────────────────────────────────────
-
-_EMOTION_PATTERNS: dict[str, list[re.Pattern]] = {
-    "raiva": [
-        re.compile(r"(?i)(baka|idiota|velho|incompetente|lixo)"),
-        re.compile(r"(?i)(COMO É QUE É|QUE É ISSO|pisar no monitor)"),
-        re.compile(r"(?i)(graduar|cuspindo cheitos|me irrita)"),
-        re.compile(r"(?i)(golpe de martelo|punho digital)"),
-        re.compile(r"[A-ZÀ-Ú]{4,}"),  # CAPS LOCK = gritando
-        re.compile(r"!{2,}"),  # Múltiplas exclamações
-    ],
-    "vergonha": [
-        re.compile(r"(?i)(b-baka|q-quem|n-não|h-humph)"),
-        re.compile(r"(?i)(gaguej|desviar? o olhar|constrangiment)"),
-        re.compile(r"(?i)(não pense que|não se acostume|não é como se)"),
-        re.compile(r"(?i)(buffering|pane)"),
-    ],
-    "surpresa": [
-        re.compile(r"(?i)(o qu[eê]|hein|sério|impossível)"),
-        re.compile(r"(?i)(não acredito|como assim)"),
-        re.compile(r"\?{2,}"),  # Múltiplas interrogações
-    ],
-    "alegria": [
-        re.compile(r"(?i)(hehe|nyah|perfeito|excelente|bravo)"),
-        re.compile(r"(?i)(faixa preta|mestre|elite)"),
-        re.compile(r"(?i)(yosh|sugoi|kawaii)"),
-    ],
-    "tedio": [
-        re.compile(r"(?i)(beta|molequice|básico|entediante)"),
-        re.compile(r"(?i)(faixa branca|treino básico|óbvio)"),
-        re.compile(r"(?i)(hmph|tsc|whatever)"),
-    ],
-}
-
-
 class EmotionAnalyzer:
-    """Analisador de emoções baseado em padrões textuais.
+    """Analisador de emoções baseado em padrões textuais da persona.
 
     Analisa texto e retorna a emoção dominante com score de intensidade.
     """
 
-    def __init__(self) -> None:
-        self._patterns = _EMOTION_PATTERNS
+    def __init__(self, profile: "PersonaProfile") -> None:
+        self._patterns: dict[str, list[re.Pattern]] = {}
+        
+        # Compila os patterns do Profile carregado dinamicamente
+        for emotion, regex_list in profile.emotion_patterns.items():
+            compiled_list = []
+            for pattern_str in regex_list:
+                try:
+                    compiled_list.append(re.compile(pattern_str))
+                except re.error as e:
+                    logger.error(f"Padrão Regex inválido para '{emotion}': {pattern_str} - {e}")
+            
+            if compiled_list:
+                self._patterns[emotion] = compiled_list
+        
+        logger.debug(f"EmotionAnalyzer compilou categorias: {list(self._patterns.keys())}")
 
     def analyze(self, text: str) -> tuple[str, float]:
         """Analisa texto e retorna (emoção, score).

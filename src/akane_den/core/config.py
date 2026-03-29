@@ -105,16 +105,7 @@ class VTubeConfig(BaseModel):
     lip_sync: bool = True
     lip_sensitivity: float = Field(1.5, ge=0.1, le=5.0)
     lip_smoothing: float = Field(0.4, ge=0.0, le=1.0)
-    emotion_map: dict[str, str] = Field(
-        default_factory=lambda: {
-            "alegria": "星星眼",
-            "raiva": "阴险启用",
-            "surpresa": "惊讶",
-            "tedio": "白眼",
-            "vergonha": "害羞",
-            "neutro": "眼睛恢复",
-        }
-    )
+    lip_smoothing: float = Field(0.4, ge=0.0, le=1.0)
 
 
 class MemoryConfig(BaseModel):
@@ -154,6 +145,7 @@ class AkaneConfig(BaseModel):
 
     ptt_key: str = "f2"
     input_mode: Literal["ptt", "vad"] = "ptt"
+    persona: str = "akane_default"
 
     tts: TTSConfig = Field(default_factory=TTSConfig)
     asr: ASRConfig = Field(default_factory=ASRConfig)

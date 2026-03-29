@@ -88,33 +88,46 @@ class GeminiLLMEngine(LLMEngine):
         logger.info(f"GeminiLLMEngine inicializado: {config.brain.gemini_model}")
 
     async def chat(self, messages: list, tools: list | None = None) -> object:
-        """Invoca Gemini (roda em thread pool para não bloquear)."""
+        """Invoca Gemini (isolado em thread para não bloquear o event loop)."""
         llm = self._llm
         if tools and not self._tools_bound:
             llm = llm.bind_tools(tools)
 
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(None, llm.invoke, messages)
-        return response
+        return await loop.run_in_executor(None, llm.invoke, messages)
 
     async def chat_stream(
         self,
         messages: list,
         tools: list | None = None,
     ) -> AsyncIterator[str]:
-        """Stream de resposta do Gemini."""
+        """Stream híbrido: Roda gerador síncrono em Thread e entrega via Queue."""
         llm = self._llm
         if tools and not self._tools_bound:
             llm = llm.bind_tools(tools)
 
-        # LangChain stream() retorna um iterador síncrono
         loop = asyncio.get_running_loop()
+        queue = asyncio.Queue()
 
-        def _stream_sync():
-            return list(llm.stream(messages))
+        def _sync_stream():
+            try:
+                for chunk in llm.stream(messages):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        chunks = await loop.run_in_executor(None, _stream_sync)
-        for chunk in chunks:
+        loop.run_in_executor(None, _sync_stream)
+
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            if isinstance(chunk, Exception):
+                logger.error(f"Erro no LLM stream de {self.config.brain.gemini_model}: {chunk}")
+                break
+            
             if hasattr(chunk, "content") and chunk.content:
                 content = chunk.content
                 if isinstance(content, str):
@@ -182,12 +195,27 @@ class GroqLLMEngine(LLMEngine):
             llm = llm.bind_tools(tools)
 
         loop = asyncio.get_running_loop()
+        queue = asyncio.Queue()
 
-        def _stream_sync():
-            return list(llm.stream(messages))
+        def _sync_stream():
+            try:
+                for chunk in llm.stream(messages):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        chunks = await loop.run_in_executor(None, _stream_sync)
-        for chunk in chunks:
+        loop.run_in_executor(None, _sync_stream)
+
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            if isinstance(chunk, Exception):
+                logger.error(f"Erro no LLM stream de {self.config.brain.groq_model}: {chunk}")
+                break
+
             if hasattr(chunk, "content") and chunk.content:
                 if isinstance(chunk.content, str):
                     yield chunk.content
@@ -248,12 +276,27 @@ class OllamaLLMEngine(LLMEngine):
             llm = llm.bind_tools(tools)
 
         loop = asyncio.get_running_loop()
+        queue = asyncio.Queue()
 
-        def _stream_sync():
-            return list(llm.stream(messages))
+        def _sync_stream():
+            try:
+                for chunk in llm.stream(messages):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        chunks = await loop.run_in_executor(None, _stream_sync)
-        for chunk in chunks:
+        loop.run_in_executor(None, _sync_stream)
+
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            if isinstance(chunk, Exception):
+                logger.error(f"Erro no LLM stream de {self.config.brain.ollama_model}: {chunk}")
+                break
+
             if hasattr(chunk, "content") and chunk.content:
                 if isinstance(chunk.content, str):
                     yield chunk.content
@@ -314,12 +357,27 @@ class OpenAILLMEngine(LLMEngine):
             llm = llm.bind_tools(tools)
 
         loop = asyncio.get_running_loop()
+        queue = asyncio.Queue()
 
-        def _stream_sync():
-            return list(llm.stream(messages))
+        def _sync_stream():
+            try:
+                for chunk in llm.stream(messages):
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
-        chunks = await loop.run_in_executor(None, _stream_sync)
-        for chunk in chunks:
+        loop.run_in_executor(None, _sync_stream)
+
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            if isinstance(chunk, Exception):
+                logger.error(f"Erro no LLM stream de {self.config.brain.openai_model}: {chunk}")
+                break
+
             if hasattr(chunk, "content") and chunk.content:
                 if isinstance(chunk.content, str):
                     yield chunk.content

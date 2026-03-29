@@ -1,0 +1,54 @@
+# Ambientes Virtuais
+venv/
+env/
+.venv/
+.env/
+
+# Chaves e Tokens (DADOS SENSÍVEIS)
+.env
+vts_token.txt
+vts_token_lipsync.txt
+vts_token_mouse.txt
+
+# Bancos de Dados / Memória
+local_chroma_db/
+chroma.sqlite3
+
+# Logs e Saídas de Teste
+logs/
+*.log
+test_output*.txt
+install_log*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# OS & IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo

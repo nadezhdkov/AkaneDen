@@ -1,0 +1,93 @@
+# ============================================================
+# Akane Den — Configuração Central (Arquitetura Shogun v3.0)
+# ============================================================
+# "Não mexa nesse arquivo sem minha permissão, baka!" — Akane
+#
+# Migrado para sistema Pydantic com validação de tipos.
+# Todos os campos possuem valores padrão. Sobrescreva apenas
+# o que precisar customizar.
+
+akane:
+  # --- Input Mode ---
+  ptt_key: "f2"           # Tecla push-to-talk (customizável)
+  input_mode: "ptt"       # "ptt" (primário) ou "vad" (fallback)
+
+  # --- Speech-to-Text (ASR) ---
+  asr:
+    provider: "whisper"    # "whisper" ou "sherpa"
+    model_size: "small"    # tiny, small, medium, large
+    device: "cpu"          # cpu ou cuda
+    language: "pt"
+    # Sherpa-onnx (SenseVoiceSmall int8) — se provider="sherpa"
+    # sherpa_model_path: "models/sensevoice-small.onnx"
+    # sherpa_tokens_path: "models/tokens.txt"
+
+  # --- Text-to-Speech (Motor Híbrido) ---
+  tts:
+    default_engine: "edge"                  # "edge", "elevenlabs", ou "sherpa"
+    edge_voice: "pt-BR-ThalitaNeural"
+    edge_pitch: "+12Hz"
+    edge_rate: "+10%"
+    elevenlabs_voice_id: "MEJe6hPrI48Kt2lFuVe3"  # Yumi (feminina)
+    elevenlabs_model: "eleven_flash_v2_5"
+    emotion_threshold: 0.7                  # Score mínimo para ativar ElevenLabs
+
+  # --- Visão / Consciência Ambiental ---
+  vision:
+    enabled: true
+    auto_capture_interval: 0    # Segundos entre capturas (0=desabilitado)
+    gemini_model: "gemini-2.5-flash"
+
+  # --- VTube Studio ---
+  vtube:
+    port: 8001
+    mouse_tracking: true
+    mouse_sensitivity: 1.0
+    lip_sync: true
+    lip_sensitivity: 1.5
+    lip_smoothing: 0.4
+    emotion_map:
+      alegria: "星星眼"
+      raiva: "阴险启用"
+      surpresa: "惊讶"
+      tedio: "白眼"
+      vergonha: "害羞"
+      neutro: "眼睛恢复"
+
+  # --- Cérebro (LLM) ---
+  brain:
+    provider: "gemini"           # "gemini", "groq", "ollama", "openai"
+    temperature: 0.7
+    max_history: 50
+
+    # Gemini (default)
+    gemini_model: "gemini-2.5-flash"
+
+    # Groq (alternativo — requer GROQ_API_KEY)
+    # groq_model: "llama-3.3-70b-versatile"
+
+    # Ollama (local — requer servidor rodando)
+    # ollama_model: "llama3.2"
+    # ollama_base_url: "http://localhost:11434"
+
+    # OpenAI (alternativo — requer OPENAI_API_KEY)
+    # openai_model: "gpt-4o-mini"
+
+  # --- Memória de Longo Prazo ---
+  memory:
+    enabled: true
+    backend: "chromadb"           # "chromadb", "letta", ou "none"
+    db_path: "local_chroma_db"
+    embedding_model: "all-MiniLM-L6-v2"
+
+    # Letta (MemGPT) — para futuro
+    # letta_base_url: "http://localhost:8283"
+    # letta_agent_name: "akane"
+
+  # --- MCP (Model Context Protocol) ---
+  mcp:
+    enabled: true
+    tools:
+      - "duckduckgo_search"     # Pesquisa web em tempo real
+      - "stagehand"             # Navegação e leitura de páginas
+      - "image_generation"      # Geração de imagens (thumbnails, assets)

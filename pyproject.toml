@@ -1,0 +1,111 @@
+# ============================================================
+# AkaneDen v3.0 — Shogun Async Architecture
+# ============================================================
+# "Não mexa nessa config de pacotes sem minha permissão, baka!"
+# ============================================================
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "akane-den"
+version = "3.0.0"
+description = "The Martial Tsundere AI — VTuber assistant with Shogun async architecture"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "rickm" },
+]
+
+dependencies = [
+    # --- Core Framework ---
+    "langchain>=0.3",
+    "langchain-google-genai>=2.0",
+    "langgraph>=0.2",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.0",
+
+    # --- Logging ---
+    "loguru>=0.7",
+
+    # --- Config ---
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+
+    # --- Speech-to-Text (ASR default) ---
+    "faster-whisper>=1.0",
+
+    # --- Text-to-Speech (TTS) ---
+    "edge-tts>=6.0",
+    "elevenlabs>=1.0",
+
+    # --- Audio ---
+    "sounddevice>=0.4",
+    "numpy>=1.24",
+    "pygame>=2.5",
+
+    # --- VTuber ---
+    "pyvts>=0.4",
+
+    # --- Input ---
+    "pynput>=1.7",
+    "pyautogui>=0.9",
+    "Pillow>=10.0",
+
+    # --- Memory / RAG ---
+    "chromadb>=0.4",
+    "sentence-transformers>=2.0",
+    "langchain-huggingface>=0.1",
+
+    # --- Vision ---
+    "google-generativeai>=0.8",
+
+    # --- MCP (Model Context Protocol) ---
+    "mcp>=1.0",
+    "duckduckgo-search>=6.0",
+]
+
+[project.optional-dependencies]
+# ASR local de alta performance (SenseVoiceSmall int8)
+sherpa = ["sherpa-onnx>=1.10"]
+
+# Provedores LLM alternativos
+groq = ["langchain-groq>=0.2"]
+ollama = ["langchain-ollama>=0.2"]
+openai = ["langchain-openai>=0.2"]
+
+# Memória de longo prazo avançada
+letta = ["letta-client>=0.5"]
+
+# Desenvolvimento e testes
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+# Tudo de uma vez (exceto sherpa que é pesado)
+all = [
+    "akane-den[groq,ollama,openai,dev]",
+]
+
+[project.scripts]
+akane = "akane_den.main:cli_entry"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/akane_den"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]

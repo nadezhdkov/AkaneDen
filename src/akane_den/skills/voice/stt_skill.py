@@ -61,7 +61,7 @@ class STTSkill(BaseSkill):
                 await self.event_bus.emit("user_text_ready", {
                     "text": text.strip(),
                     "audio_duration": len(audio) / sample_rate,
-                })
+                }, fire_and_forget=True)
             else:
                 logger.debug("STT: transcrição vazia.")
 

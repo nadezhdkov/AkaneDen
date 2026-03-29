@@ -112,57 +112,90 @@ async def main() -> None:
     vision_skill: ScreenVisionSkill = manager.get_skill("screen_vision")
 
     async def on_user_text(data: dict) -> None:
-        """Pipeline completo: texto → brain → TTS streaming."""
+        """Pipeline completo: texto → brain → TTS streaming.
+
+        Protegido por timeout de 15s e error handling robusto.
+        Roda como task independente via fire_and_forget.
+        """
         user_text = data.get("text", "")
         if not user_text:
             return
 
         logger.info(f"Usuário: '{user_text}'")
 
-        # Contexto visual (se disponível)
-        vision_ctx = None
-        if vision_skill and vision_skill.last_description:
-            vision_ctx = vision_skill.last_description
+        try:
+            async with asyncio.timeout(15):
+                # Contexto visual (se disponível)
+                vision_ctx = None
+                if vision_skill and vision_skill.last_description:
+                    vision_ctx = vision_skill.last_description
 
-        # Captura screenshot fresco se configurado
-        if vision_skill and config.vision.enabled:
-            try:
-                result = await asyncio.wait_for(
-                    vision_skill.execute(source="screen"),
-                    timeout=5.0,
+                # Captura screenshot fresco se configurado
+                if vision_skill and config.vision.enabled:
+                    try:
+                        result = await asyncio.wait_for(
+                            vision_skill.execute(source="screen"),
+                            timeout=3.0,
+                        )
+                        if "description" in result:
+                            vision_ctx = result["description"]
+                    except asyncio.TimeoutError:
+                        logger.debug("Timeout na captura de visão — usando cache.")
+                    except Exception as e:
+                        logger.debug(f"Visão não disponível: {e}")
+
+                # ⚡ STREAMING: Brain gera → TTS sintetiza sentença por sentença
+                sentence_stream = brain.think_stream(
+                    user_text=user_text,
+                    vision_context=vision_ctx,
                 )
-                if "description" in result:
-                    vision_ctx = result["description"]
-            except asyncio.TimeoutError:
-                logger.debug("Timeout na captura de visão — usando cache.")
-            except Exception as e:
-                logger.debug(f"Visão não disponível: {e}")
 
-        # ⚡ STREAMING: Brain gera → TTS sintetiza sentença por sentença
-        sentence_stream = brain.think_stream(
-            user_text=user_text,
-            vision_context=vision_ctx,
-        )
+                # Intercepta o stream para analisar emoção e disparar expressão
+                async def emotion_aware_stream():
+                    first_sentence = True
+                    async for sentence in sentence_stream:
+                        # Analisa emoção na primeira sentença
+                        if first_sentence:
+                            emotion, score = brain.analyze_emotion(sentence)
+                            await service.event_bus.emit("emotion_detected", {
+                                "emotion": emotion,
+                                "score": score,
+                            })
+                            logger.info(
+                                f"Akane ({emotion}): '{sentence[:60]}...'"
+                            )
+                            first_sentence = False
+                        yield sentence
 
-        # Intercepta o stream para analisar emoção e disparar expressão
-        async def emotion_aware_stream():
-            first_sentence = True
-            async for sentence in sentence_stream:
-                # Analisa emoção na primeira sentença
-                if first_sentence:
-                    emotion, score = brain.analyze_emotion(sentence)
-                    await service.event_bus.emit("emotion_detected", {
-                        "emotion": emotion,
-                        "score": score,
-                    })
-                    logger.info(
-                        f"Akane ({emotion}): '{sentence[:60]}...'"
-                    )
-                    first_sentence = False
-                yield sentence
+                # Fala em streaming (Faster First Response)
+                await tts_skill.speak_streaming(emotion_aware_stream())
 
-        # Fala em streaming (Faster First Response)
-        await tts_skill.speak_streaming(emotion_aware_stream())
+        except TimeoutError:
+            logger.error(
+                "⏰ Pipeline timeout (15s)! Gemini ou TTS travou."
+            )
+            try:
+                await tts_skill.execute(
+                    text="Sua conexão de batata me fez perder o fio "
+                         "da meada, baka! Tenta de novo!",
+                    emotion="irritacao",
+                )
+            except Exception:
+                pass
+
+        except asyncio.CancelledError:
+            logger.debug("Pipeline cancelado (barge-in ou shutdown).")
+
+        except Exception as e:
+            logger.error(f"Erro no pipeline de conversação: {e}")
+            try:
+                await tts_skill.execute(
+                    text="Tsc! Meus circuitos deram um curto! "
+                         "Culpa desse hardware de faixa branca!",
+                    emotion="irritacao",
+                )
+            except Exception:
+                pass
 
     # Registra o pipeline no EventBus
     service.event_bus.on("user_text_ready", on_user_text)

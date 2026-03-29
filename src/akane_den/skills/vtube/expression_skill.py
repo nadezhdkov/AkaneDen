@@ -31,7 +31,8 @@ class ExpressionSkill(BaseSkill):
         super().__init__(ctx, service)
         self._vts = None
         self._connected = False
-        self._emotion_map = service.config.vtube.emotion_map
+        self._emotion_map = service.persona.vtube_mapping
+        self._vts_hotkeys: dict[str, str] = {} # Internal names mapped directly
 
     async def setup(self) -> None:
         """Conecta ao VTube Studio."""
@@ -53,6 +54,17 @@ class ExpressionSkill(BaseSkill):
             await self._vts.request_authenticate()
             self._connected = True
 
+            # Autodiscovery de Hotkeys
+            hotkeys_req = self._vts.vts_request.requestHotkeys()
+            response = await self._vts.request(hotkeys_req)
+            
+            # Indexar as hotkeys reais disponíveis no modelo
+            if "data" in response and "availableHotkeys" in response["data"]:
+                for hk in response["data"]["availableHotkeys"]:
+                    self._vts_hotkeys[hk["name"]] = hk["name"]
+            
+            logger.info(f"VTube Studio: {len(self._vts_hotkeys)} hotkeys encontradas.")
+
             # Registra listener para emoções
             self.event_bus.on("emotion_detected", self._on_emotion)
 
@@ -72,14 +84,23 @@ class ExpressionSkill(BaseSkill):
         if not self._connected or not self._vts:
             return
 
-        expression_file = self._emotion_map.get(emotion)
-        if not expression_file:
+        target_hotkey = self._emotion_map.get(emotion)
+        if not target_hotkey:
+            return
+
+        # Valida se a hotkey existe no payload recebido do VTube Studio
+        if target_hotkey not in self._vts_hotkeys:
+            logger.warning(
+                f"A expressão '{target_hotkey}' requerida pela emoção '{emotion}' "
+                f"na Persona '{self.service.persona.name}' não foi encontrada "
+                f"no modelo atual do VTube Studio."
+            )
             return
 
         try:
-            req = self._vts.vts_request.requestTriggerHotkey(expression_file)
+            req = self._vts.vts_request.requestTriggerHotkey(target_hotkey)
             await self._vts.request(req)
-            logger.debug(f"Expressão disparada: {emotion} -> {expression_file}")
+            logger.debug(f"Expressão disparada: {emotion} -> {target_hotkey}")
         except Exception as e:
             logger.error(f"Erro ao disparar expressão: {e}")
             self._connected = False

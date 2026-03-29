@@ -124,7 +124,7 @@ async def main() -> None:
         logger.info(f"Usuário: '{user_text}'")
 
         try:
-            async with asyncio.timeout(15):
+            async with asyncio.timeout(30):
                 # Contexto visual (se disponível)
                 vision_ctx = None
                 if vision_skill and vision_skill.last_description:
@@ -172,7 +172,7 @@ async def main() -> None:
 
         except TimeoutError:
             logger.error(
-                "⏰ Pipeline timeout (15s)! Gemini ou TTS travou."
+                "⏰ Pipeline timeout (30s)! Gemini ou TTS travou."
             )
             try:
                 await tts_skill.execute(

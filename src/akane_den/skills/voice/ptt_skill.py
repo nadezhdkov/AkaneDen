@@ -104,11 +104,12 @@ class PTTSkill(BaseSkill):
 
         if self._audio_buffer:
             audio = np.concatenate(self._audio_buffer)
-            # Emite áudio para processamento STT
+            # Emite áudio para processamento STT (fire_and_forget:
+            # o handler de tecla retorna imediato, transcrição em background)
             await self.event_bus.emit("user_speech_ready", {
                 "audio": audio,
                 "sample_rate": self._sample_rate,
-            })
+            }, fire_and_forget=True)
 
     async def _record_audio(self) -> None:
         """Grava áudio do microfone enquanto PTT está pressionado."""

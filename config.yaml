@@ -3,21 +3,121 @@
 # ============================================================
 # "Não mexa nesse arquivo sem minha permissão, baka!" — Akane
 #
-# Migrado para sistema Pydantic com validação de tipos.
-# Todos os campos possuem valores padrão. Sobrescreva apenas
-# o que precisar customizar.
+# 📘 DOCUMENTAÇÃO
+# ------------------------------------------------------------
+# Este arquivo define toda a configuração central do sistema
+# Akane Den (VTuber AI modular).
+#
+# ✔ Baseado em validação via Pydantic
+# ✔ Todos os campos possuem valores padrão
+# ✔ Você pode sobrescrever apenas o necessário
+#
+# ------------------------------------------------------------
+# 📦 EXEMPLO COMPLETO DE CONFIGURAÇÃO
+# ------------------------------------------------------------
+# (Use como referência para setups personalizados)
+#
+# akane:
+#   ptt_key: "f2"
+#   input_mode: "ptt"
+#   persona: "akane_default"
+#
+#   asr:
+#     provider: "whisper"
+#     model_size: "small"
+#     device: "cuda"
+#     language: "pt"
+#
+#   tts:
+#     default_engine: "edge"
+#     edge_voice: "pt-BR-ThalitaNeural"
+#     edge_pitch: "+10Hz"
+#     edge_rate: "+5%"
+#     elevenlabs_voice_id: "MEJe6hPrI48Kt2lFuVe3"
+#     elevenlabs_model: "eleven_flash_v2_5"
+#     emotion_threshold: 0.75
+#
+#   vision:
+#     enabled: true
+#     auto_capture_interval: 5
+#     gemini_model: "gemini-2.5-flash"
+#
+#   vtube:
+#     port: 8001
+#     mouse_tracking: true
+#     mouse_sensitivity: 1.2
+#     lip_sync: true
+#     lip_sensitivity: 1.6
+#     lip_smoothing: 0.3
+#
+#   brain:
+#     provider: "gemini"
+#     temperature: 0.7
+#     max_history: 60
+#     gemini_model: "gemini-2.5-flash"
+#
+#   memory:
+#     enabled: true
+#     backend: "chromadb"
+#     db_path: "local_chroma_db"
+#     embedding_model: "all-MiniLM-L6-v2"
+#
+#   mcp:
+#     enabled: true
+#     tools:
+#       - "duckduckgo_search"
+#       - "stagehand"
+#       - "image_generation"
+#
+# ------------------------------------------------------------
+# 🧾 CHANGELOG / COMMITS POR SEÇÃO
+# ------------------------------------------------------------
+#
+# [INPUT]
+# feat(input): suporte a modo híbrido (PTT + VAD fallback)
+# refactor(input): abstração de input desacoplada do ASR
+#
+# [ASR]
+# feat(asr): suporte a Whisper e Sherpa-ONNX
+# perf(asr): otimização de inferência em CUDA
+#
+# [TTS]
+# feat(tts): motor híbrido Edge + ElevenLabs baseado em emoção
+# feat(tts): controle fino de pitch e velocidade
+#
+# [VISION]
+# feat(vision): captura automática de tela para contexto
+# feat(vision): integração com Gemini Vision
+#
+# [VTUBE]
+# feat(vtube): integração com VTube Studio via WebSocket
+# feat(vtube): lip sync baseado em amplitude de áudio
+#
+# [BRAIN]
+# feat(brain): suporte multi-provider (Gemini, Groq, Ollama, OpenAI)
+# refactor(brain): gerenciamento de histórico com limite dinâmico
+#
+# [MEMORY]
+# feat(memory): integração com ChromaDB
+# feat(memory): embeddings semânticos locais
+#
+# [MCP]
+# feat(mcp): suporte a ferramentas externas (web, automação, geração)
+# feat(mcp): arquitetura extensível de plugins
+#
+# ============================================================
 
 akane:
   # --- Input Mode ---
-  ptt_key: "f2"           # Tecla push-to-talk (customizável)
-  input_mode: "ptt"       # "ptt" (primário) ou "vad" (fallback)
+  ptt_key: "f2" # Tecla push-to-talk (customizável)
+  input_mode: "ptt" # "ptt" (primário) ou "vad" (fallback)
   persona: "akane_default" # YAML de Perfil de Personagem
 
   # --- Speech-to-Text (ASR) ---
   asr:
-    provider: "whisper"    # "whisper" ou "sherpa"
-    model_size: "small"    # tiny, small, medium, large
-    device: "cpu"          # cpu ou cuda
+    provider: "whisper" # "whisper" ou "sherpa"
+    model_size: "medium" # tiny, small, medium, large
+    device: "cpu" # cpu ou cuda
     language: "pt"
     # Sherpa-onnx (SenseVoiceSmall int8) — se provider="sherpa"
     # sherpa_model_path: "models/sensevoice-small.onnx"
@@ -25,18 +125,18 @@ akane:
 
   # --- Text-to-Speech (Motor Híbrido) ---
   tts:
-    default_engine: "edge"                  # "edge", "elevenlabs", ou "sherpa"
+    default_engine: "edge" # "edge", "elevenlabs", ou "sherpa"
     edge_voice: "pt-BR-ThalitaNeural"
     edge_pitch: "+12Hz"
     edge_rate: "+10%"
-    elevenlabs_voice_id: "MEJe6hPrI48Kt2lFuVe3"  # Yumi (feminina)
+    elevenlabs_voice_id: "MEJe6hPrI48Kt2lFuVe3" # Yumi (feminina)
     elevenlabs_model: "eleven_flash_v2_5"
-    emotion_threshold: 0.7                  # Score mínimo para ativar ElevenLabs
+    emotion_threshold: 0.7 # Score mínimo para ativar ElevenLabs
 
   # --- Visão / Consciência Ambiental ---
   vision:
     enabled: true
-    auto_capture_interval: 0    # Segundos entre capturas (0=desabilitado)
+    auto_capture_interval: 0 # Segundos entre capturas (0=desabilitado)
     gemini_model: "gemini-2.5-flash"
 
   # --- VTube Studio ---
@@ -50,7 +150,7 @@ akane:
 
   # --- Cérebro (LLM) ---
   brain:
-    provider: "gemini"           # "gemini", "groq", "ollama", "openai"
+    provider: "gemini" # "gemini", "groq", "ollama", "openai"
     temperature: 0.7
     max_history: 50
 
@@ -70,7 +170,7 @@ akane:
   # --- Memória de Longo Prazo ---
   memory:
     enabled: true
-    backend: "chromadb"           # "chromadb", "letta", ou "none"
+    backend: "chromadb" # "chromadb", "letta", ou "none"
     db_path: "local_chroma_db"
     embedding_model: "all-MiniLM-L6-v2"
 
@@ -82,6 +182,6 @@ akane:
   mcp:
     enabled: true
     tools:
-      - "duckduckgo_search"     # Pesquisa web em tempo real
-      - "stagehand"             # Navegação e leitura de páginas
-      - "image_generation"      # Geração de imagens (thumbnails, assets)
+      - "duckduckgo_search" # Pesquisa web em tempo real
+      - "stagehand" # Navegação e leitura de páginas
+      - "image_generation" # Geração de imagens (thumbnails, assets)

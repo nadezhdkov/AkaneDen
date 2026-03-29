@@ -29,10 +29,13 @@ from loguru import logger
 async def main() -> None:
     """Ponto de entrada principal do AkaneDen v3.0."""
     # ──────────────────────────────────────────
-    # 1. Carrega variáveis de ambiente
+    # 1. Carrega variáveis de ambiente e silenciamentos
     # ──────────────────────────────────────────
     from dotenv import load_dotenv
     load_dotenv()
+
+    # Oculta aviso chato de symlink do HuggingFace Hub no Windows
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
     logger.info("=" * 60)
     logger.info("  AkaneDen v3.0 — Shogun Async Architecture")
@@ -87,6 +90,7 @@ async def main() -> None:
     from akane_den.skills.vision.screen_vision_skill import ScreenVisionSkill
     from akane_den.skills.vtube.expression_skill import ExpressionSkill
     from akane_den.skills.vtube.mouse_tracker_skill import MouseTrackerSkill
+    from akane_den.skills.vtube.lipsync_skill import LipSyncSkill
 
     manager = SkillManager()
     manager.register(PTTSkill(service))
@@ -95,6 +99,7 @@ async def main() -> None:
     manager.register(ScreenVisionSkill(service))
     manager.register(ExpressionSkill(service))
     manager.register(MouseTrackerSkill(service))
+    manager.register(LipSyncSkill(service))
 
     await manager.setup_all()
 

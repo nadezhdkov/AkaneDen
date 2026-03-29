@@ -78,6 +78,10 @@ class MouseTrackerSkill(BaseSkill):
                 target_x = ((x / screen_w) - 0.5) * 60 * sensitivity
                 target_y = ((y / screen_h) - 0.5) * -60 * sensitivity
 
+                # Clamp values para sanear coordenadas de multi-monitores
+                target_x = max(-30.0, min(30.0, target_x))
+                target_y = max(-30.0, min(30.0, target_y))
+
                 smooth_x += alpha * (target_x - smooth_x)
                 smooth_y += alpha * (target_y - smooth_y)
 

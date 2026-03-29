@@ -66,14 +66,26 @@ class MouseTrackerSkill(BaseSkill):
             logger.warning(f"Mouse tracker não pôde iniciar: {e}")
 
     async def _tracking_loop(self) -> None:
-        """Loop de tracking a ~30fps."""
+        """Loop de tracking a ~30fps com watchdog de starvation."""
+        import time
+
         screen_w, screen_h = pyautogui.size()
         sensitivity = self.config.vtube.mouse_sensitivity
         smooth_x, smooth_y = 0.0, 0.0
         alpha = 0.3
+        last_frame = time.monotonic()
 
         while self._active and self._vts_connected:
             try:
+                now = time.monotonic()
+                delta = now - last_frame
+                if delta > 0.1:
+                    logger.warning(
+                        f"⚠ Event Loop Starvation: {delta*1000:.0f}ms "
+                        f"entre frames do mouse tracker"
+                    )
+                last_frame = now
+
                 x, y = pyautogui.position()
                 target_x = ((x / screen_w) - 0.5) * 60 * sensitivity
                 target_y = ((y / screen_h) - 0.5) * -60 * sensitivity

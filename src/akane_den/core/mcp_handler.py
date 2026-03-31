@@ -40,7 +40,10 @@ def search_web(query: str) -> str:
         Resultados resumidos da pesquisa.
     """
     try:
-        from duckduckgo_search import DDGS
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
 
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=5))
@@ -79,7 +82,10 @@ def search_news(query: str) -> str:
         Notícias recentes sobre o tópico.
     """
     try:
-        from duckduckgo_search import DDGS
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
 
         with DDGS() as ddgs:
             results = list(ddgs.news(query, max_results=5))
@@ -190,9 +196,11 @@ def generate_image(prompt: str, filename: str = "akane_generated.png") -> str:
         if response.candidates and response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
                 if hasattr(part, "inline_data") and part.inline_data:
-                    output_dir = "generated_images"
-                    os.makedirs(output_dir, exist_ok=True)
-                    output_path = os.path.join(output_dir, filename)
+                    from pathlib import Path
+                    from akane_den.core.paths import BASE_DIR
+                    output_dir = BASE_DIR / "generated_images"
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    output_path = output_dir / filename
                     with open(output_path, "wb") as f:
                         f.write(part.inline_data.data)
                     return f"Imagem gerada com sucesso: {output_path}"
@@ -209,30 +217,56 @@ def generate_image(prompt: str, filename: str = "akane_generated.png") -> str:
 
 
 @tool
-def run_powershell_command(command: str) -> str:
-    """Executa um comando PowerShell no Windows.
-    Use para automação de sistema, verificar processos,
-    gerenciar arquivos, etc.
+def run_system_command(command: str) -> str:
+    """Executa um comando no terminal do sistema hospedado.
+    No Windows usa PowerShell, no Linux usa Bash.
+    Use para automação de sistema, criar arquivos, mover, listar processos, etc.
 
     Args:
-        command: Comando PowerShell a executar.
+        command: Comando a executar.
 
     Returns:
         Saída do comando ou mensagem de erro.
     """
     import subprocess
+    import re
+    import sys
+
+    # Lista de bloqueio para comandos destrutivos massivos
+    forbidden = [
+        "rm", "remove-item", "del", "erase", "format", 
+        "clear-disk", "format-volume", "rd", "rmdir", "stop-computer",
+        "restart-computer", "sysprep", "mkfs"
+    ]
+    
+    cmd_lower = command.lower()
+    for word in forbidden:
+        if re.search(rf"\b{word}\b", cmd_lower) and "rm" not in cmd_lower.replace("rmdir", ""): # safety net
+            # Uma regex melhor para evitar falsos positivos
+            pass
+        if re.search(rf"(?<![a-zA-Z]){word}(?![a-zA-Z])", cmd_lower):
+            return f"ERRO DE SEGURANÇA: O comando contém instrução destrutiva bloqueada '{word}'."
 
     try:
-        result = subprocess.run(
-            ["powershell", "-Command", command],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            encoding="utf-8",
-            errors="replace",
-        )
+        if sys.platform == "linux":
+            result = subprocess.run(
+                ["/bin/bash", "-c", command],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        else:
+            result = subprocess.run(
+                ["powershell", "-Command", command],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                encoding="utf-8",
+                errors="replace",
+            )
+            
         output = result.stdout.strip() or result.stderr.strip()
-        return output[:2000] if output else "Comando executado sem saída."
+        return output[:2000] if output else "Comando executado sem saída visível."
     except subprocess.TimeoutExpired:
         return "Comando expirou (timeout de 30 segundos)."
     except Exception as e:
@@ -242,25 +276,37 @@ def run_powershell_command(command: str) -> str:
 @tool
 def open_program(program_name: str) -> str:
     """Abre um programa/aplicativo no Windows.
+    Use para abrir softwares instalados como 'Steam', 'Discord', 'Notepad', 'Code', etc.
+    Ele vai pesquisar no sistema e tentar abrir.
 
     Args:
-        program_name: Nome ou caminho do programa (ex: 'notepad', 'code', 'chrome').
+        program_name: Nome ou atalho do programa (ex: 'Steam', 'Discord'). Se souber a URI, também pode enviar (ex: steam://).
 
     Returns:
         Confirmação ou erro.
     """
     import subprocess
+    import sys
 
     try:
-        subprocess.Popen(
-            program_name,
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return f"Programa '{program_name}' aberto."
+        if sys.platform == "linux":
+            # No Linux, tenta usar o xdg-open ou atalhos conhecidos
+            subprocess.Popen(
+                ["xdg-open", program_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            return f"Sinal enviado ao Linux para abrir '{program_name}' via xdg-open."
+        else:
+            # O cmd /c start "" vai consultar os 'App Paths' do registro do Windows
+            subprocess.run(
+                ["cmd", "/c", "start", "", program_name],
+                capture_output=True,
+                timeout=10,
+            )
+            return f"Sinal enviado ao Windows para abrir '{program_name}'."
     except Exception as e:
-        return f"Erro ao abrir '{program_name}': {e}"
+        return f"Erro ao sinalizar abertura de '{program_name}': {e}"
 
 
 @tool
@@ -277,9 +323,32 @@ def open_url(url: str) -> str:
 
     try:
         webbrowser.open(url)
-        return f"URL aberta: {url}"
+        return f"URL aberta com sucesso: {url}"
     except Exception as e:
         return f"Erro ao abrir URL: {e}"
+
+
+@tool
+def play_youtube(query: str) -> str:
+    """Abre o YouTube pesquisando por um vídeo ou música específicos.
+    Use quando o usuário pedir para tocar uma música, ver um vídeo, etc.
+
+    Args:
+        query: Nome da música, clipe, ou termo para buscar no YouTube.
+
+    Returns:
+        Confirmação de que abriu a pesquisa.
+    """
+    import urllib.parse
+    import webbrowser
+
+    try:
+        encoded_query = urllib.parse.quote(query)
+        url = f"https://www.youtube.com/results?search_query={encoded_query}"
+        webbrowser.open(url)
+        return f"Pesquisando '{query}' no YouTube."
+    except Exception as e:
+        return f"Erro ao acessar o YouTube: {e}"
 
 
 @tool
@@ -290,30 +359,50 @@ def get_system_info() -> str:
     Returns:
         Informações resumidas do sistema.
     """
+    import sys
     import subprocess
 
-    commands = {
-        "CPU": "Get-CimInstance Win32_Processor | Select-Object Name, LoadPercentage | Format-List",
-        "RAM": "Get-CimInstance Win32_OperatingSystem | Select-Object @{N='TotalGB';E={[math]::Round($_.TotalVisibleMemorySize/1MB,1)}}, @{N='FreeGB';E={[math]::Round($_.FreePhysicalMemory/1MB,1)}} | Format-List",
-        "Disco": "Get-PSDrive C | Select-Object @{N='UsedGB';E={[math]::Round($_.Used/1GB,1)}}, @{N='FreeGB';E={[math]::Round($_.Free/1GB,1)}} | Format-List",
-    }
-
     output = []
-    for name, cmd in commands.items():
+    
+    if sys.platform == "linux":
+        # Abordagem Linux nativa (fallback para free, top, df)
         try:
-            result = subprocess.run(
-                ["powershell", "-Command", cmd],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                encoding="utf-8",
-                errors="replace",
-            )
-            output.append(f"**{name}:**\n{result.stdout.strip()}")
-        except Exception as e:
-            output.append(f"**{name}:** Erro: {e}")
+            import psutil
+            cpu = f"Load: {psutil.cpu_percent()}%"
+            mem = psutil.virtual_memory()
+            ram = f"TotalGB: {round(mem.total/1024**3, 1)}, FreeGB: {round(mem.available/1024**3, 1)}"
+            disk = psutil.disk_usage('/')
+            dsc = f"UsedGB: {round(disk.used/1024**3, 1)}, FreeGB: {round(disk.free/1024**3, 1)}"
+            output = [f"**CPU:**\n{cpu}", f"**RAM:**\n{ram}", f"**Disco (Root):**\n{dsc}"]
+            return "\n\n".join(output)
+        except ImportError:
+            # Fallback bash
+            cpu = subprocess.run(["bash", "-c", "top -bn1 | grep 'Cpu(s)'"], capture_output=True, text=True).stdout.strip()
+            ram = subprocess.run(["bash", "-c", "free -h | grep Mem"], capture_output=True, text=True).stdout.strip()
+            dsc = subprocess.run(["bash", "-c", "df -h /"], capture_output=True, text=True).stdout.strip()
+            return f"**CPU:**\n{cpu}\n\n**RAM:**\n{ram}\n\n**Disco (/):**\n{dsc}"
+    else:
+        commands = {
+            "CPU": "Get-CimInstance Win32_Processor | Select-Object Name, LoadPercentage | Format-List",
+            "RAM": "Get-CimInstance Win32_OperatingSystem | Select-Object @{N='TotalGB';E={[math]::Round($_.TotalVisibleMemorySize/1MB,1)}}, @{N='FreeGB';E={[math]::Round($_.FreePhysicalMemory/1MB,1)}} | Format-List",
+            "Disco": "Get-PSDrive C | Select-Object @{N='UsedGB';E={[math]::Round($_.Used/1GB,1)}}, @{N='FreeGB';E={[math]::Round($_.Free/1GB,1)}} | Format-List",
+        }
 
-    return "\n\n".join(output)
+        for name, cmd in commands.items():
+            try:
+                result = subprocess.run(
+                    ["powershell", "-Command", cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                output.append(f"**{name}:**\n{result.stdout.strip()}")
+            except Exception as e:
+                output.append(f"**{name}:** Erro: {e}")
+
+        return "\n\n".join(output)
 
 
 @tool
@@ -326,12 +415,15 @@ def take_screenshot() -> str:
     try:
         from PIL import ImageGrab
         import time
+        from pathlib import Path
+        from akane_den.core.paths import BASE_DIR
 
-        os.makedirs("screenshots", exist_ok=True)
+        out_dir = BASE_DIR / "screenshots"
+        out_dir.mkdir(parents=True, exist_ok=True)
         timestamp = int(time.time())
-        path = f"screenshots/screen_{timestamp}.png"
+        path = out_dir / f"screen_{timestamp}.png"
         img = ImageGrab.grab()
-        img.save(path)
+        img.save(str(path))
         return f"Screenshot salvo: {path}"
     except Exception as e:
         return f"Erro ao capturar screenshot: {e}"
@@ -353,7 +445,7 @@ class MCPToolRegistry:
         "duckduckgo_search": [search_web, search_news],
         "stagehand": [browse_webpage],
         "image_generation": [generate_image],
-        "system": [run_powershell_command, open_program, open_url, get_system_info],
+        "system": [run_system_command, open_program, open_url, get_system_info, play_youtube],
         "screenshot": [take_screenshot],
     }
 

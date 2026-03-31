@@ -1,8 +1,10 @@
 """
-MouseTrackerSkill v3.0 — Avatar segue o cursor do mouse.
+MouseTrackerSkill v3.3 — Avatar segue o cursor do mouse.
 
 Rastreia a posição do mouse e injeta parâmetros FaceAngleX/Y
 no VTube Studio, fazendo o avatar seguir o cursor em tempo real.
+
+v3.3: Yields estratégicos para priorizar responsividade do event loop.
 
 Migrada para ServiceContext na v3.0.
 """
@@ -66,7 +68,11 @@ class MouseTrackerSkill(BaseSkill):
             logger.warning(f"Mouse tracker não pôde iniciar: {e}")
 
     async def _tracking_loop(self) -> None:
-        """Loop de tracking a ~30fps com watchdog de starvation."""
+        """Loop de tracking a ~30fps com watchdog de starvation.
+
+        v3.3: Yields estratégicos (asyncio.sleep(0)) garantem que o
+        event loop respire entre operações, priorizando responsividade.
+        """
         import time
 
         screen_w, screen_h = pyautogui.size()
@@ -79,7 +85,7 @@ class MouseTrackerSkill(BaseSkill):
             try:
                 now = time.monotonic()
                 delta = now - last_frame
-                if delta > 0.1:
+                if delta > 0.25:
                     logger.warning(
                         f"⚠ Event Loop Starvation: {delta*1000:.0f}ms "
                         f"entre frames do mouse tracker"
@@ -97,7 +103,13 @@ class MouseTrackerSkill(BaseSkill):
                 smooth_x += alpha * (target_x - smooth_x)
                 smooth_y += alpha * (target_y - smooth_y)
 
+                # Yield: permite que o event loop processe outros eventos
+                # ANTES da injeção no VTS (prioriza responsividade)
+                await asyncio.sleep(0)
+
                 await self._inject("FaceAngleX", smooth_x)
+                # Yield: respira entre as duas injeções de parâmetros
+                await asyncio.sleep(0)
                 await self._inject("FaceAngleY", smooth_y)
                 await asyncio.sleep(0.033)
 

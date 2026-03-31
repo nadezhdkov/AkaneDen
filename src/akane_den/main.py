@@ -3,12 +3,13 @@ Main Orchestrator — AkaneDen v3.0 (Shogun Async).
 
 Ponto de entrada principal do sistema. Inicializa e coordena:
 1. Config (Pydantic) → ServiceContext → Skills
-2. Brain (LangGraph) com streaming
+2. Brain (LangGraph) com streaming + persistência SQLite
 3. Pipeline de voz (PTT → STT → Brain → TTS) com Faster First Response
 4. VTube Studio (expressões + mouse tracking)
 5. Visão ambiental (screenshots + webcam)
 6. MCP tools (DuckDuckGo, Stagehand, ImageGen)
 7. Memória de longo prazo (ChromaDB/Letta)
+8. [v3.5] Web Dashboard (config manager)
 
 "Eu sou o maestro dessa orquestra digital. Cada skill é um
 instrumento, e eu faço todos tocarem em harmonia.
@@ -88,6 +89,8 @@ async def main() -> None:
     from akane_den.skills.voice.stt_skill import STTSkill
     from akane_den.skills.voice.tts_skill import TTSSkill
     from akane_den.skills.vision.screen_vision_skill import ScreenVisionSkill
+    from akane_den.skills.system.proactive_speak_skill import ProactiveSpeakSkill
+    from akane_den.skills.live.twitch_chat_skill import TwitchChatSkill
     from akane_den.skills.vtube.expression_skill import ExpressionSkill
     from akane_den.skills.vtube.mouse_tracker_skill import MouseTrackerSkill
     from akane_den.skills.vtube.lipsync_skill import LipSyncSkill
@@ -97,129 +100,43 @@ async def main() -> None:
     manager.register(STTSkill(service))
     manager.register(TTSSkill(service))
     manager.register(ScreenVisionSkill(service))
+    manager.register(ProactiveSpeakSkill(service, timeout_seconds=300))
+    manager.register(TwitchChatSkill(service))
     manager.register(ExpressionSkill(service))
     manager.register(MouseTrackerSkill(service))
     manager.register(LipSyncSkill(service))
 
     await manager.setup_all()
 
-    # Referências rápidas
-    tts_skill: TTSSkill = manager.get_skill("tts")
-
     # ──────────────────────────────────────────
     # 8. Configura o pipeline de conversação
     # ──────────────────────────────────────────
+    from akane_den.core.pipeline import ConversationPipeline
+
+    tts_skill: TTSSkill = manager.get_skill("tts")
     vision_skill: ScreenVisionSkill = manager.get_skill("screen_vision")
 
-    async def on_user_text(data: dict) -> None:
-        """Pipeline completo: texto → brain → TTS streaming.
-
-        Protegido por timeout de 15s e error handling robusto.
-        Roda como task independente via fire_and_forget.
-        """
-        user_text = data.get("text", "")
-        if not user_text:
-            return
-
-        logger.info(f"Usuário: '{user_text}'")
-
-        try:
-            async with asyncio.timeout(15):
-                # Contexto visual (se disponível)
-                vision_ctx = None
-                if vision_skill and vision_skill.last_description:
-                    vision_ctx = vision_skill.last_description
-
-                # Captura screenshot fresco se configurado
-                if vision_skill and config.vision.enabled:
-                    try:
-                        result = await asyncio.wait_for(
-                            vision_skill.execute(source="screen"),
-                            timeout=3.0,
-                        )
-                        if "description" in result:
-                            vision_ctx = result["description"]
-                    except asyncio.TimeoutError:
-                        logger.debug("Timeout na captura de visão — usando cache.")
-                    except Exception as e:
-                        logger.debug(f"Visão não disponível: {e}")
-
-                # ⚡ STREAMING: Brain gera → TTS sintetiza sentença por sentença
-                sentence_stream = brain.think_stream(
-                    user_text=user_text,
-                    vision_context=vision_ctx,
-                )
-
-                # Intercepta o stream para analisar emoção e disparar expressão
-                async def emotion_aware_stream():
-                    first_sentence = True
-                    async for sentence in sentence_stream:
-                        # Analisa emoção na primeira sentença
-                        if first_sentence:
-                            emotion, score = brain.analyze_emotion(sentence)
-                            await service.event_bus.emit("emotion_detected", {
-                                "emotion": emotion,
-                                "score": score,
-                            })
-                            logger.info(
-                                f"Akane ({emotion}): '{sentence[:60]}...'"
-                            )
-                            first_sentence = False
-                        yield sentence
-
-                # Fala em streaming (Faster First Response)
-                await tts_skill.speak_streaming(emotion_aware_stream())
-
-        except TimeoutError:
-            logger.error(
-                "⏰ Pipeline timeout (15s)! Gemini ou TTS travou."
-            )
-            try:
-                await tts_skill.execute(
-                    text="Sua conexão de batata me fez perder o fio "
-                         "da meada, baka! Tenta de novo!",
-                    emotion="irritacao",
-                )
-            except Exception:
-                pass
-
-        except asyncio.CancelledError:
-            logger.debug("Pipeline cancelado (barge-in ou shutdown).")
-
-        except Exception as e:
-            logger.error(f"Erro no pipeline de conversação: {e}")
-            try:
-                await tts_skill.execute(
-                    text="Tsc! Meus circuitos deram um curto! "
-                         "Culpa desse hardware de faixa branca!",
-                    emotion="irritacao",
-                )
-            except Exception:
-                pass
-
-    # Registra o pipeline no EventBus
-    service.event_bus.on("user_text_ready", on_user_text)
-
-    # ──────────────────────────────────────────
-    # 9. Barge-in handler
-    # ──────────────────────────────────────────
-    async def on_barge_in(data: dict) -> None:
-        """Interrompe TTS quando o usuário pressiona PTT."""
-        await tts_skill.stop_speaking()
-        logger.debug("Barge-in: TTS interrompido.")
-
-    service.event_bus.on("barge_in", on_barge_in)
+    pipeline = ConversationPipeline(
+        service=service,
+        brain=brain,
+        tts_skill=tts_skill,
+        vision_skill=vision_skill,
+        config=config,
+    )
+    pipeline.register_handlers()
 
     # ──────────────────────────────────────────
     # 10. Boot message
     # ──────────────────────────────────────────
-    logger.success("=" * 60)
-    logger.success("  AkaneDen v3.0 ONLINE!")
+    logger.success("="  * 60)
+    logger.success("  AkaneDen v3.5 ONLINE!")
     logger.success(f"  Brain: {service.llm.model_name}")
     logger.success(f"  TTS: {service.tts.engine_name}")
     logger.success(f"  ASR: {service.asr.engine_name}")
+    logger.success(f"  VAD: {service.vad.engine_name if service.vad else 'Desativado (PTT)'}")
     logger.success(f"  Tools: {len(mcp_tools)} MCP tools ativos")
     logger.success(f"  Memory: {memory.backend_name if memory else 'desabilitada'}")
+    logger.success(f"  ChatHistory: {'SQLite' if service.chat_history else 'desabilitado'}")
     logger.success(f"  Skills: {len(manager)} registradas")
     logger.success(f"  PTT Key: {config.ptt_key}")
     logger.success("=" * 60)
@@ -227,7 +144,40 @@ async def main() -> None:
     logger.success("  Ctrl+C para encerrar.")
     logger.success("=" * 60)
 
-    # Boot TTS — Akane se apresenta
+    # ──────────────────────────────────────────
+    # 11. Web Dashboard (opcional)
+    # ──────────────────────────────────────────
+    dashboard_thread = None
+    if config.dashboard.enabled:
+        import threading
+
+        from akane_den.server.app import create_dashboard_app
+
+        main_loop = asyncio.get_running_loop()
+        dash_app = create_dashboard_app(service_context=service, main_loop=main_loop)
+        dash_host = config.dashboard.host
+        dash_port = config.dashboard.port
+
+        def _run_dashboard():
+            import uvicorn
+            uvicorn.run(
+                dash_app, host=dash_host, port=dash_port,
+                log_level="warning",
+            )
+
+        dashboard_thread = threading.Thread(
+            target=_run_dashboard, daemon=True, name="dashboard"
+        )
+        dashboard_thread.start()
+        logger.success(
+            f"  Dashboard: http://{dash_host}:{dash_port}"
+        )
+    else:
+        logger.info("  Dashboard: desativado (dashboard.enabled=false)")
+
+    # ──────────────────────────────────────────
+    # 12. Boot TTS
+    # ──────────────────────────────────────────
     try:
         await tts_skill.execute(
             text="Hmpf! Estou online, baka. "
@@ -239,7 +189,7 @@ async def main() -> None:
         pass  # Boot message é opcional
 
     # ──────────────────────────────────────────
-    # 11. Main loop — mantém o sistema vivo
+    # 13. Main loop — mantém o sistema vivo
     # ──────────────────────────────────────────
     try:
         while True:
@@ -247,8 +197,11 @@ async def main() -> None:
     except (KeyboardInterrupt, asyncio.CancelledError):
         logger.info("Shutdown solicitado...")
     finally:
+        # Fecha ChatHistory
+        if service.chat_history:
+            service.chat_history.close()
         await manager.teardown_all()
-        logger.info("AkaneDen v3.0 encerrado. Até a próxima, baka.")
+        logger.info("AkaneDen v3.5 encerrado. Até a próxima, baka.")
 
 
 def cli_entry() -> None:

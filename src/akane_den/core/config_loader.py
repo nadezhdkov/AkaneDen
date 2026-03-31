@@ -31,9 +31,8 @@ def load_config(config_path: str | Path | None = None) -> AkaneConfig:
         pydantic.ValidationError: Se a config contém valores inválidos.
     """
     if config_path is None:
-        # Procura na raiz do projeto (3 níveis acima de src/akane_den/core/)
-        base_dir = Path(__file__).resolve().parent.parent.parent.parent
-        config_path = base_dir / "config.yaml"
+        from akane_den.core.paths import BASE_DIR
+        config_path = BASE_DIR / "config.yaml"
     else:
         config_path = Path(config_path)
 

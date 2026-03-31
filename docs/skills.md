@@ -69,20 +69,75 @@ Responsável pela mimetização de emoções detectadas pela IA no Output Texto 
 
 ---
 
-## Criando Novas Skills!
-Quer colocar a Akane p/ enviar mensagens no Discord? 
-Herde a base e implemente os handlers *Async*:
+## 🚀 Criando Novas Skills (Tutorial Rápido)
+
+Graças ao padrão `ServiceContext`, ensinar novas habilidades à Akane é limpo e modularizado. Uma "Skill" precisa apenas herdar de `BaseSkill` e plugar-se aos fluxos de conversão adequados (EventBus ou chamadas diretas).
+
+### 1. O Ciclo de Vida da Skill
+Toda Skill possui três fases primordiais garantidas pelo `SkillManager` durante o ciclo global de *boot* e *shutdown*:
+- `setup()`: Roda uma vez. Configura listeners, APIs e valida tokens asincronamente.
+- `execute()`: A lógica executiva da classe caso a ative manualmente pelo código ou via uma Tool Calls.
+- `teardown()`: Clean up e desconexões seguras no desligamento natural do sistema.
+
+### 2. Exemplo: Construindo uma DiscordSkill
+Queremos que a Akane reencaminhe sua fala ou mande um recadinho pro Discord toda vez que gerar algum output na engine de NLP.
+
+Crie `src/akane_den/skills/social/discord_skill.py`:
 
 ```python
+from loguru import logger
 from akane_den.core.base_skill import BaseSkill, SkillContext
 
 class DiscordSkill(BaseSkill):
-    def __init__(self, context: SkillContext, service_context):
-        super().__init__(context, service_context)
+    def __init__(self, service_context):
+        # Todo submódulo requer um SkillContext básico (nome, cooldowns em segundos)
+        ctx = SkillContext(skill_name="discord", min_cooldown=1.0, max_cooldown=5.0)
+        
+        # O Super recebe este contexto da skill + e o service_context (que possui as configs e Motores!)
+        super().__init__(ctx, service_context)
     
-    async def setup(self):
-        # Conecta no Discord via service_context
-        self._bus.on("user_text_ready", self._handler)
+    async def setup(self) -> None:
+        """Phase 1: Chamado quando a Akane liga."""
+        # Se você ler o YAML, você o puxa via self.service_context.config...
+        logger.info("DiscordSkill setup iniciado...")
+
+        # A magia: Plugar-se aos eventos globais do sistema via self.event_bus
+        self.event_bus.on("akane_response_ready", self._handler_discord_push)
+        logger.success("Ouvinte do Discord registrado.")
+
+    async def _handler_discord_push(self, data: dict) -> None:
+        """Callback lançado assincronamente quando a Akane terminar de pensar."""
+        texto = data.get("text", "")
+        # Lógica assíncrona pra HTTP Request pro Discord aqui
+        logger.debug(f"A Akane enviou para o Discord: {texto[:20]}...")
     
-    async def execute(self, **kwargs) -> dict: ...
+    async def execute(self, **kwargs) -> dict:
+        """Phase 2: Execução manual da Skill (Ex: Invocado em main() iterativamente)."""
+        mensagem = kwargs.get("mensagem", "Olá Discord.")
+        logger.info(f"Executando postagem forçada: {mensagem}")
+        return {"status": "enviado", "msg": mensagem}
+    
+    async def teardown(self) -> None:
+        """Phase 3: Chamado quando a Akane é desligada."""
+        logger.info("DiscordSkill desativado com segurança.")
 ```
+
+### 3. Registro no Skill Manager
+Para o motor principal da Assistente dar conta da Skill nova, você a inicializa no orquestrador raiz (ex: em `src/akane_den/main.py`):
+
+```python
+from akane_den.skills.social.discord_skill import DiscordSkill
+
+async def main():
+    service = await ServiceContext.create(config)
+    manager = SkillManager(service)
+    
+    # Registrando
+    discord_skill = DiscordSkill(service)
+    manager.register_skill(discord_skill)
+
+    # Ao chamar setup_all(), ela disparará o self.setup() do DiscordSkill no background
+    await manager.setup_all()
+```
+
+Com apenas essa estrutura você consegue integrar a Akane para controlar playlists do Spotify, tuitar coisas e até orquestrar lâmpadas IoT pela casa (se o Mestre permitir).

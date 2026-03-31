@@ -1,6 +1,6 @@
-# Configuração — AkaneDen v3.0
+# Configuração — AkaneDen v3.5
 
-O sistema é governado pelo `config.yaml` raiz, agora validado estritamente por classes **Pydantic**. Você pode trocar motores inteiros de IA apenas alterando uma string.
+O sistema é governado pelo `config.yaml` raiz, agora validado estritamente por classes **Pydantic v2**. Você pode trocar motores inteiros de IA apenas alterando o configuration file, e com a v3.5, essas mudanças podem ser recarregadas __em tempo real__ pelo Web Dashboard sem reiniciar o processo.
 
 ---
 
@@ -12,13 +12,13 @@ akane:
   # INPUT — Como o usuário fala com a Akane
   # ============================================================
   ptt_key: "f2"            # Segurar F2 para falar (Push-to-Talk)
-  input_mode: "ptt"        # "ptt" ou "vad" (Voice Activity Detection via Silero)
+                           # PTT aborta instantaneamente qualquer TTS tocando.
 
   # ============================================================
   # ASR (Speech-to-Text) — Reconhecimento de Voz
   # ============================================================
   asr:
-    provider: "whisper"      # "whisper" (preciso) ou "sherpa" (rapidíssimo via CPU)
+    provider: "whisper"      # Motor de prioridade.
     stt_model: "small"       # Modelos do whisper: "tiny", "small", "medium", "large"
     stt_device: "cpu"        # "cpu" ou "cuda"
 
@@ -67,44 +67,60 @@ akane:
     provider: "gemini"        # Qual cérebro usar: "gemini", "groq", "ollama", "openai"
     model: "gemini-2.5-flash" # Nome exato do modelo exigido pela API do provider
     temperature: 0.7
-    max_history: 50           # Quantos blocos de chat manter no contexto ativo
+    max_history: 50           # Quantidade de mensagens retidas na Memória Tier 1 (SQLite)
 
   # ============================================================
   # MEMORY — Memória de Longo Prazo
   # ============================================================
   memory:
     enabled: true
-    backend: "chromadb"       # "chromadb" (nativo local) ou "letta" (via MemGPT/Letta server)
-    
+    backend: "chromadb"       # Persiste contexto semântico (Tier 2)
+
   # ============================================================
   # MCP TOOLS — Automação e Busca
   # ============================================================
   mcp:
     enabled: true             # Se false, o LangGraph da Akane rodará sem tool calling
 
+  # ============================================================
+  # UI & LIVE — Interação Multicanal (v3.5)
+  # ============================================================
+  dashboard:
+    enabled: true
+    host: "127.0.0.1"
+    port: 8080                # Acessar via navegador para ver Logs SSE e Configurações
+
+  twitch:
+    enabled: true
+    channel_name: "seu_canal" # Lê o chat ao vivo e adiciona cooldowns entre mensagens.
+
+  proactive_speak:
+    enabled: true
+    timeout_seconds: 300      # Se o usuário e a Twitch não falarem por 5 mins, Akane 
+                              # puxa um assunto aleatoriamente.
 ```
 
 ---
 
 ## Variáveis de Ambiente (`.env`)
 
-Akane v3.0 usa `uv` e lê automaticamente o `.env` raiz para autenticar as dependências ativas nas Configs:
+Akane v3.5 usa `uv` e lê automaticamente o `.env` raiz para autenticar as dependências ativas nas Configs:
 
 ```ini
 # --- OBRIGATÓRIOS SE PROVIDER = GEMINI ---
 GOOGLE_API_KEY=AIzaSy...
 
-# --- OPCIONAIS / PREMIUM ---
+# --- INTEGRAÇÕES PREMIUM E LIVE ---
 ELEVENLABS_API_KEY=sk_...
 GROQ_API_KEY=gsk_...
 OPENAI_API_KEY=sk-proj...
+TWITCH_OAUTH_TOKEN=oauth:seutokenaqui
 
 # --- SERVIDORES LOCAIS (Opcionais) ---
 OLLAMA_BASE_URL=http://localhost:11434    # Caso provider seja "ollama"
-LETTA_BASE_URL=http://localhost:8283      # Caso memory backend seja "letta"
 ```
 
 ## Dicas Rápidas
-- **Como mudo pra Ollama?** Coloque `brain.provider: "ollama"` e `brain.model: "llama3"`. Certifique-se que o Ollama está rodando localmente.
-- **Como melhorar a resposta pra < 1s?** Coloque `asr.provider: "sherpa"` e `tts.default_engine: "edge"`.
-- As configurações omitidas no arquivo `yaml` são preenchidas com os defaults nativos do `Pydantic` definidos no módulo de config respectivo (ex: `src/akane_den/core/config.py`).
+- **Como mudo pra Ollama?** Coloque `brain.provider: "ollama"` e `brain.model: "llama3"`.
+- **Como a Twitch funciona?** A Akane lerá o chat. Se ela achar que o que foi dito vale a pena, ela responde em voz alta. O seu Push-To-Talk (F2) SEMPRE tem prioridade máxima e interrompe a conversa dela com o chat.
+- **Hot-Swapping**: Você pode abrir `http://localhost:8080/`, mudar qualquer configuração de Personality ou de Sistema e salvar. O backend reinjetará sem fechar o bot.

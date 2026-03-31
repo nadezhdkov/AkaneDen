@@ -1,12 +1,13 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/Gemini_2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/VTube_Studio-FF6699?style=for-the-badge&logo=youtube&logoColor=white" />
   <img src="https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" />
-  <img src="https://img.shields.io/badge/Architecture-Shogun_v3.0-DC143C?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Architecture-Shogun_v3.5-DC143C?style=for-the-badge" />
 </p>
 
-<h1 align="center">🥊 Akane Den (v3.0 Async)</h1>
+<h1 align="center">🥊 Akane Den (v3.5 Shogun)</h1>
 
 <p align="center">
   <strong>A Martial Tsundere AI — Assistente VTuber autônoma, assíncrona e consciente do ambiente</strong>
@@ -20,25 +21,27 @@
 
 ## 🎯 O que é?
 
-**Akane Den** é uma assistente de IA autônoma com avatar VTuber Live2D. Projetada na Arquitetura Shogun v3.0 (100% Async), ela processa voz, visão computacional, navega na web usando MCP Tools e possui uma memória de longo prazo, tudo embalado na personalidade "Martial Tsundere" — uma mestra de artes marciais digital rígida, reclamona, mas incrivelmente eficiente.
+**Akane Den** é uma assistente de IA autônoma com avatar VTuber Live2D. Projetada na Arquitetura Shogun v3.5 (Agentic e 100% Async), ela processa voz, visão computacional, navega na web usando MCP Tools e possui uma memória de longo prazo. A grande novidade da versão 3.5 é a introdução do **Controle via Dashboard Web**, **Proatividade** e integração robusta com a **Twitch**, encapsuladas na personalidade "Martial Tsundere".
 
-### ✨ Features da v3.0
+### ✨ Features da v3.5
 
 | Feature | Descrição |
 |---------|-----------|
-| 🎙️ **Faster First Response**| O pipeline de Streaming começa a falar a primeira frase enquanto o LLM ainda pensa na próxima! |
-| 🧠 **Multi-Engine Brain**   | Suporte a Gemini (padrão), Groq, Ollama e OpenAI plugáveis pelo `config.yaml`. |
+| 🎙️ **Zero-Latency Async Loop**| O pipeline atômico transmite áudio via Edge/Elevenlabs enquanto o LLM pensa, com `fire_and_forget` garantindo que o loop de voz nunca trave. |
+| 🎛️ **Web Dashboard UI**      | Painel de Controle local (FastAPI) para trocar Personas em tempo real (Hot-Swap), editar o `config.yaml` visualmente e ler Telemetria/Logs via SSE. |
+| 📺 **Twitch Integration**     | Integração assíncrona com `twitchio` permitindo ler e responder ao chat da Twitch ao vivo. |
+| 🔔 **Proactive Speaking**     | Akane não apenas reage, mas engaja na conversa proativamente se você se ausentar longamente, usando monitoramento de silêncio e timers independentes. |
+| 🧠 **Multi-Engine Brain**   | Suporte nativo a Gemini (Padrão), Groq (Qwen3-32b/Llama3.3), Ollama e OpenAI plugáveis on-the-fly. |
 | 🛠️ **MCP Tools**            | Acesso em tempo real via DuckDuckGo Search, navegação web e visão do sistema OS. |
-| 👁️ **Visão Multimodal**     | Lê simultaneamente a sua tela e webcam via Gemini Vision em background. |
-| 🤯 **Memória de Longo Prazo**| Recorda conversas e contextos passados através do ChromaDB (local). |
-| 🎨 **TTS Híbrido**          | Motor rápido (Edge-TTS) e emocional de alta definição (ElevenLabs) roteado pela reação dela. |
-| 🖱️ **Comunicação VTube**    | Rastreia seu mouse (~30fps) e altera as emoções do Live2D automaticamente. |
+| 👁️ **Visão Multimodal**     | Lê simultaneamente a sua tela e webcam em background via ScreenVisionSkill. |
+| 🤯 **Memória de Longo Prazo**| Recorda conversas e contextos passados através de SQLite e ChromaDB (arquitetura em tiers). |
+| 🖱️ **Comunicação VTube**    | Rastreia seu mouse (~30fps) e altera as expressões no Live2D de modo autônomo analisando o contexto. |
 
 ---
 
-## 🏗️ Arquitetura (Shogun v3.0)
+## 🏗️ Arquitetura (Shogun v3.5)
 
-Totalmente movida por `asyncio`, injeção de dependência via **ServiceContext** e validação estrita com **Pydantic**:
+Totalmente movida por `asyncio`, injeção de dependência via **ServiceContext**, painel sidecar em **FastAPI**, e validação estrita com **Pydantic**:
 
 ```
 AkaneDen/
@@ -46,18 +49,20 @@ AkaneDen/
 ├── pyproject.toml           # Gestão de pacotes moderna via uv
 ├── src/
 │   └── akane_den/
-│       ├── main.py          # Orquestrador assíncrono
-│       ├── core/            # Pydantic Config, EventBus, Factory & MCP
+│       ├── main.py          # Orquestrador assíncrono (Event Loop)
+│       ├── server/          # 🎛️ FastAPI Web Dashboard (App & HTML)
+│       ├── core/            # 🏯 Pydantic Config, EventBus, Factory & MCP
 │       │   └── engines/     # ABCs para LLMs, TTS e ASR
-│       ├── brain/           # LangGraph Streaming, Emoções, Persona e Memória
-│       └── skills/          # Pacotes modulares
-│           ├── voice/       # PTT (Push-to-Talk), STT e TTS
-│           ├── vision/      # Screen & Webcam vision
-│           ├── system/      # Automação de OS / Butler
-│           └── vtube/       # Expressões faciais & Mouse Tracking
+│       ├── brain/           # 🧠 LangGraph Streaming, Emoções, Persona e Memória
+│       └── skills/          # 🎯 Pacotes modulares
+│           ├── voice/       # PTT (Push-to-Talk) e TTS
+│           ├── vision/      # Screen & Webcam vision em background
+│           ├── system/      # ProactiveSpeak & OS Controls
+│           ├── live/        # TwitchChat integration
+│           └── vtube/       # Expressões faciais & Mouse e LipSync
 ```
 
-> Veja a documentação das Skills em [`docs/skills.md`](docs/skills.md).
+> Veja as Docs de Backend em [`docs/architecture.md`](docs/architecture.md) e configuração do sistema em [`docs/configuration.md`](docs/configuration.md).
 
 ---
 
@@ -69,6 +74,12 @@ Recomendamos o gerenciador de pacotes moderno [uv](https://github.com/astral-sh/
 - **Python 3.11+**
 - **VTube Studio** (com API WebSocket habilitada na porta 8001 e os plugins permitidos)
 - **Microfone** e **Webcam** funcionais
+
+> [!WARNING]
+> **Rodando no Linux (Ubuntu/Debian)**
+> - Instale dependências de áudio do SO: `sudo apt install libasound2-dev portaudio19-dev xclip scrot`
+> - **Captura de Tela (Vision):** Requer o pacote `scrot` nativo sob ambiente **X11**. Wayland nativo sem XWayland tem suporte limitado sem configs extras.
+> - **Push-to-talk (F2):** Dependendo do sistema (especialmente Wayland), capturar atalhos globais pode exigir rodar parte do processo com privilégios de `root` (sudo) ou configurar privilégios de grupo `input`. Se falhar, use temporariamente X11.
 
 ### 2. Setup do Projeto
 ```bash
@@ -123,40 +134,46 @@ akane:
     backend: "chromadb"         # Histórico salvo localmente
   mcp:
     enabled: true               # Habilita pesquisa duckduckgo e browsing
+  dashboard:
+    enabled: true               # Habilita o Dashboard Web FastAPI
+  twitch:
+    enabled: true               # Habilita leitura do chat da Twitch
+    channel_name: "seu_canal"
+
 ```
 
 ---
 
 ## ▶️ Como Rodar
 
-Basta iniciar o projeto com o script fornecido na raiz.
+Basta iniciar o projeto via gerenciador de pacotes ou pelo executável Batch.
 
 ```bash
-# Via script nativo (Windows)
+# Script de Terminal Customizado
 start_vtube.bat
 
-# Ou diretamente via módulo python
+# Ou diretamente via módulo (se o ambiente uv estiver ativado)
 python -m akane_den.main
 ```
 
 ### Controles
-1. **Segure a tecla F2** e fale naturalmente com a Akane.
-2. **Solte a tecla** para ela transcrever a voz e pensar. Graças ao **Faster First Response**, a resposta começará em instantes.
-3. **Barge-in (Corte a Mestra):** Comece a segurar `F2` enquanto ela estiver falando para mandá-la calar a boca (esteja preparado(a) para a irritação).
+1. **Dashboard Local:** Acesse `http://127.0.0.1:8080/` para monitorar latência, ajustar configurações e trocar o personagem sem precisar derrubar o terminal.
+2. **Push-To-Talk (F2):** Segure `F2` para interagir nativamente e falar com ela. Isso irá interromper conversas em background (como conversas com leitores da Twitch).
+3. **Barge-in (Corte a Mestra):** Comece a segurar `F2` enquanto ela estiver falando para mandá-la calar a boca instantaneamente.
 
 ---
 
-## 📚 Stack Tecnológica (v3.0)
+## 📚 Stack Tecnológica (v3.5)
 
 | Camada | Stack |
 |--------|-------|
 | LLM | API do Gemini 2.5 Flash, Groq, Ollama Llama 3 |
 | Pipeline & Grafos | LangGraph, LangChain Streaming |
-| Memória Vetorial | ChromaDB, Embeddings locais via HF |
-| Voice (STT) | Faster-Whisper, Sherpa-onnx |
+| Memória & Estado | ChromaDB Local, SQLite para chat history |
+| Voice (STT) | Faster-Whisper, Groq Whisper |
 | Voice (TTS) | Edge-TTS, ElevenLabs (Streaming) |
-| Gestão do SO | PyAutoGUI, Pynput, OpenCV |
-| Config & Logs | Pydantic Models, Loguru |
+| Servidor Web | FastAPI, Server-Sent Events (SSE) |
+| Integração Live | TwitchIO |
 | Dependências | `uv` via `pyproject.toml` |
 
 ---

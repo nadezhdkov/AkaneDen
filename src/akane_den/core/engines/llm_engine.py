@@ -5,7 +5,7 @@ Padrão Factory: cada provedor herda de LLMEngine e implementa
 chat() e chat_stream() assíncronos. A troca de provedor é feita
 apenas no config.yaml sem alterar nenhum código.
 
-Provedores implementados:
+Provedores implementados baseados na LangChainLLMEngine:
     - GeminiLLMEngine (default)
     - GroqLLMEngine
     - OllamaLLMEngine
@@ -24,6 +24,7 @@ from typing import AsyncIterator
 from loguru import logger
 
 from akane_den.core.config import AkaneConfig
+from akane_den.core.runtime import run_in_io
 
 
 class LLMEngine(ABC):
@@ -52,8 +53,8 @@ class LLMEngine(ABC):
         self,
         messages: list,
         tools: list | None = None,
-    ) -> AsyncIterator[str]:
-        """Gera resposta em streaming (yield de chunks de texto)."""
+    ) -> AsyncIterator[str | list]:
+        """Gera resposta em streaming (yield de chunks de texto ou list de tool_calls)."""
         ...
 
     @abstractmethod
@@ -68,12 +69,80 @@ class LLMEngine(ABC):
         ...
 
 
+class LangChainLLMEngine(LLMEngine):
+    """Classe base Template Method para provedores baseados no LangChain."""
+
+    def __init__(self, config: AkaneConfig) -> None:
+        super().__init__(config)
+        self._llm = None
+        self._tools_bound = False
+
+    async def chat(self, messages: list, tools: list | None = None) -> object:
+        """Invoca o LLM (isolado em IO_POOL)."""
+        llm = self._llm
+        if not llm:
+            raise RuntimeError("LLM não inicializado pela subclasse.")
+
+        if tools and not self._tools_bound:
+            llm = llm.bind_tools(tools)
+
+        try:
+            return await run_in_io(llm.invoke, messages)
+        except Exception as e:
+            logger.error(f"[LLM] Falha na chamada síncrona ({self.model_name}): {e}")
+            raise
+
+    async def chat_stream(
+        self,
+        messages: list,
+        tools: list | None = None,
+    ) -> AsyncIterator[str | list]:
+        """Stream híbrido unificado para todos os modelos."""
+        llm = self._llm
+        if not llm:
+            raise RuntimeError("LLM não inicializado pela subclasse.")
+
+        if tools and not self._tools_bound:
+            llm = llm.bind_tools(tools)
+
+        try:
+            full_chunk = None
+            async for chunk in llm.astream(messages):
+                if full_chunk is None:
+                    full_chunk = chunk
+                else:
+                    full_chunk += chunk
+
+                if hasattr(chunk, "content") and chunk.content:
+                    content = chunk.content
+                    if isinstance(content, str):
+                        yield content
+                    elif isinstance(content, list):
+                        for block in content:
+                            if isinstance(block, dict) and block.get("type") == "text":
+                                yield block.get("text", "")
+                            elif isinstance(block, str):
+                                yield block
+            
+            if full_chunk and hasattr(full_chunk, "tool_calls") and full_chunk.tool_calls:
+                yield full_chunk.tool_calls
+
+        except Exception as e:
+            logger.error(f"[{self.model_name}] RateLimit/Conexão abortada: {e}")
+            yield "\n[H-humph! Meu cérebro deu um nó agora, baka! Não me pressione tanto, tente de novo em um minuto!]"
+
+    def bind_tools(self, tools: list) -> None:
+        if self._llm is not None:
+            self._llm = self._llm.bind_tools(tools)
+            self._tools_bound = True
+
+
 # ──────────────────────────────────────────────
 # Implementação: Gemini (Default)
 # ──────────────────────────────────────────────
 
 
-class GeminiLLMEngine(LLMEngine):
+class GeminiLLMEngine(LangChainLLMEngine):
     """LLM Engine usando Google Gemini via langchain-google-genai."""
 
     def __init__(self, config: AkaneConfig) -> None:
@@ -84,64 +153,7 @@ class GeminiLLMEngine(LLMEngine):
             model=config.brain.gemini_model,
             temperature=config.brain.temperature,
         )
-        self._tools_bound = False
-        logger.info(f"GeminiLLMEngine inicializado: {config.brain.gemini_model}")
-
-    async def chat(self, messages: list, tools: list | None = None) -> object:
-        """Invoca Gemini (isolado em thread para não bloquear o event loop)."""
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, llm.invoke, messages)
-
-    async def chat_stream(
-        self,
-        messages: list,
-        tools: list | None = None,
-    ) -> AsyncIterator[str]:
-        """Stream híbrido: Roda gerador síncrono em Thread e entrega via Queue."""
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        queue = asyncio.Queue()
-
-        def _sync_stream():
-            try:
-                for chunk in llm.stream(messages):
-                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
-            except Exception as e:
-                loop.call_soon_threadsafe(queue.put_nowait, e)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        loop.run_in_executor(None, _sync_stream)
-
-        while True:
-            chunk = await queue.get()
-            if chunk is None:
-                break
-            if isinstance(chunk, Exception):
-                logger.error(f"Erro no LLM stream de {self.config.brain.gemini_model}: {chunk}")
-                break
-            
-            if hasattr(chunk, "content") and chunk.content:
-                content = chunk.content
-                if isinstance(content, str):
-                    yield content
-                elif isinstance(content, list):
-                    for block in content:
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            yield block.get("text", "")
-                        elif isinstance(block, str):
-                            yield block
-
-    def bind_tools(self, tools: list) -> None:
-        self._llm = self._llm.bind_tools(tools)
-        self._tools_bound = True
+        logger.info(f"GeminiLLMEngine inicializado: {self.model_name}")
 
     @property
     def model_name(self) -> str:
@@ -153,7 +165,7 @@ class GeminiLLMEngine(LLMEngine):
 # ──────────────────────────────────────────────
 
 
-class GroqLLMEngine(LLMEngine):
+class GroqLLMEngine(LangChainLLMEngine):
     """LLM Engine usando Groq via langchain-groq."""
 
     def __init__(self, config: AkaneConfig) -> None:
@@ -169,60 +181,12 @@ class GroqLLMEngine(LLMEngine):
                 kwargs["groq_api_base"] = config.brain.groq_api_base
 
             self._llm = ChatGroq(**kwargs)
-            self._tools_bound = False
-            logger.info(f"GroqLLMEngine inicializado: {config.brain.groq_model}")
+            logger.info(f"GroqLLMEngine inicializado: {self.model_name}")
         except ImportError:
             raise ImportError(
                 "langchain-groq não instalado! Instale com: "
                 "uv pip install 'akane-den[groq]'"
             )
-
-    async def chat(self, messages: list, tools: list | None = None) -> object:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, llm.invoke, messages)
-
-    async def chat_stream(
-        self,
-        messages: list,
-        tools: list | None = None,
-    ) -> AsyncIterator[str]:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        queue = asyncio.Queue()
-
-        def _sync_stream():
-            try:
-                for chunk in llm.stream(messages):
-                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
-            except Exception as e:
-                loop.call_soon_threadsafe(queue.put_nowait, e)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        loop.run_in_executor(None, _sync_stream)
-
-        while True:
-            chunk = await queue.get()
-            if chunk is None:
-                break
-            if isinstance(chunk, Exception):
-                logger.error(f"Erro no LLM stream de {self.config.brain.groq_model}: {chunk}")
-                break
-
-            if hasattr(chunk, "content") and chunk.content:
-                if isinstance(chunk.content, str):
-                    yield chunk.content
-
-    def bind_tools(self, tools: list) -> None:
-        self._llm = self._llm.bind_tools(tools)
-        self._tools_bound = True
 
     @property
     def model_name(self) -> str:
@@ -234,7 +198,7 @@ class GroqLLMEngine(LLMEngine):
 # ──────────────────────────────────────────────
 
 
-class OllamaLLMEngine(LLMEngine):
+class OllamaLLMEngine(LangChainLLMEngine):
     """LLM Engine usando Ollama local via langchain-ollama."""
 
     def __init__(self, config: AkaneConfig) -> None:
@@ -247,63 +211,12 @@ class OllamaLLMEngine(LLMEngine):
                 temperature=config.brain.temperature,
                 base_url=config.brain.ollama_base_url,
             )
-            self._tools_bound = False
-            logger.info(
-                f"OllamaLLMEngine inicializado: {config.brain.ollama_model} "
-                f"@ {config.brain.ollama_base_url}"
-            )
+            logger.info(f"OllamaLLMEngine inicializado: {self.model_name} @ {config.brain.ollama_base_url}")
         except ImportError:
             raise ImportError(
                 "langchain-ollama não instalado! Instale com: "
                 "uv pip install 'akane-den[ollama]'"
             )
-
-    async def chat(self, messages: list, tools: list | None = None) -> object:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, llm.invoke, messages)
-
-    async def chat_stream(
-        self,
-        messages: list,
-        tools: list | None = None,
-    ) -> AsyncIterator[str]:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        queue = asyncio.Queue()
-
-        def _sync_stream():
-            try:
-                for chunk in llm.stream(messages):
-                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
-            except Exception as e:
-                loop.call_soon_threadsafe(queue.put_nowait, e)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        loop.run_in_executor(None, _sync_stream)
-
-        while True:
-            chunk = await queue.get()
-            if chunk is None:
-                break
-            if isinstance(chunk, Exception):
-                logger.error(f"Erro no LLM stream de {self.config.brain.ollama_model}: {chunk}")
-                break
-
-            if hasattr(chunk, "content") and chunk.content:
-                if isinstance(chunk.content, str):
-                    yield chunk.content
-
-    def bind_tools(self, tools: list) -> None:
-        self._llm = self._llm.bind_tools(tools)
-        self._tools_bound = True
 
     @property
     def model_name(self) -> str:
@@ -315,7 +228,7 @@ class OllamaLLMEngine(LLMEngine):
 # ──────────────────────────────────────────────
 
 
-class OpenAILLMEngine(LLMEngine):
+class OpenAILLMEngine(LangChainLLMEngine):
     """LLM Engine usando OpenAI ou compatíveis via langchain-openai."""
 
     def __init__(self, config: AkaneConfig) -> None:
@@ -331,60 +244,12 @@ class OpenAILLMEngine(LLMEngine):
                 kwargs["openai_api_base"] = config.brain.openai_api_base
 
             self._llm = ChatOpenAI(**kwargs)
-            self._tools_bound = False
-            logger.info(f"OpenAILLMEngine inicializado: {config.brain.openai_model}")
+            logger.info(f"OpenAILLMEngine inicializado: {self.model_name}")
         except ImportError:
             raise ImportError(
                 "langchain-openai não instalado! Instale com: "
                 "uv pip install 'akane-den[openai]'"
             )
-
-    async def chat(self, messages: list, tools: list | None = None) -> object:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, llm.invoke, messages)
-
-    async def chat_stream(
-        self,
-        messages: list,
-        tools: list | None = None,
-    ) -> AsyncIterator[str]:
-        llm = self._llm
-        if tools and not self._tools_bound:
-            llm = llm.bind_tools(tools)
-
-        loop = asyncio.get_running_loop()
-        queue = asyncio.Queue()
-
-        def _sync_stream():
-            try:
-                for chunk in llm.stream(messages):
-                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
-            except Exception as e:
-                loop.call_soon_threadsafe(queue.put_nowait, e)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
-
-        loop.run_in_executor(None, _sync_stream)
-
-        while True:
-            chunk = await queue.get()
-            if chunk is None:
-                break
-            if isinstance(chunk, Exception):
-                logger.error(f"Erro no LLM stream de {self.config.brain.openai_model}: {chunk}")
-                break
-
-            if hasattr(chunk, "content") and chunk.content:
-                if isinstance(chunk.content, str):
-                    yield chunk.content
-
-    def bind_tools(self, tools: list) -> None:
-        self._llm = self._llm.bind_tools(tools)
-        self._tools_bound = True
 
     @property
     def model_name(self) -> str:

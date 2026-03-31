@@ -1,26 +1,57 @@
-# Ambientes Virtuais
+# ===========================================================
+# Akane Den — .gitignore (Segurança & Performance)
+# ===========================================================
+# "Se vazar uma chave, eu vou graduar o seu repositório!" — Akane
+# ===========================================================
+
+# ===== DADOS SENSÍVEIS (CRÍTICO) =====
+.env
+.env.*
+!.env.example
+vts_token*.txt
+*.key
+*.pem
+*.crt
+*.pfx
+
+# ===== Modelos & Binários Pesados =====
+models/
+*.tar.bz2
+*.tar.gz
+*.zip
+*.onnx
+*.bin
+*.pt
+*.pth
+*.gguf
+*.safetensors
+sensevoice_int8.tar.bz2
+
+# ===== Bancos de Dados / Memória =====
+local_chroma_db/
+chroma.sqlite3
+*.db
+*.sqlite3
+
+# ===== Chat History (Dados Pessoais) =====
+chat_history/
+
+# ===== Ambientes Virtuais =====
 venv/
 env/
 .venv/
 .env/
 
-# Chaves e Tokens (DADOS SENSÍVEIS)
-.env
-vts_token.txt
-vts_token_lipsync.txt
-vts_token_mouse.txt
-
-# Bancos de Dados / Memória
-local_chroma_db/
-chroma.sqlite3
-
-# Logs e Saídas de Teste
+# ===== Logs e Saídas de Teste =====
 logs/
 *.log
 test_output*.txt
 install_log*.txt
+push_log.txt
+vision_test_out.txt
+git_out.txt
 
-# Python
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
@@ -44,11 +75,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# OS & IDEs
+# ===== Docker =====
+docker-data/
+
+# ===== OS & IDEs =====
 .DS_Store
 Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
 .vs/
 *.swp
 *.swo
+*~
+
+# ===== Lock files (opcional — descomente se quiser versionar) =====
+# uv.lock

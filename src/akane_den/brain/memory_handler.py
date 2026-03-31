@@ -13,6 +13,7 @@ me enganar só porque reiniciou o sistema!" — Akane
 
 from __future__ import annotations
 
+
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
@@ -98,14 +99,24 @@ class ChromaMemoryHandler(MemoryHandler):
                 name="akane_memory",
                 metadata={"hnsw:space": "cosine"},
             )
+            # WARM-UP: O ChromaDB usa sentence-transformers/onnx. A primeira query
+            # puxa a DLL e aloca modelo pesadíssimo, travando o GIL por até 15s.
+            # Essa busca "vazia" força o cacheamento durante o boot!
+            try:
+                collection.query(
+                    query_texts=["warmup"],
+                    n_results=1,
+                )
+            except Exception as e:
+                pass
+                
             return client, collection
 
-        self._client, self._collection = await loop.run_in_executor(
-            None, _init_sync
-        )
+        from akane_den.core.runtime import run_in_db
+        self._client, self._collection = await run_in_db(_init_sync)
         count = self._collection.count()
         logger.info(
-            f"ChromaDB inicializado: {self.config.db_path} "
+            f"ChromaDB inicializado e warmed-up: {self.config.db_path} "
             f"({count} memórias armazenadas)"
         )
 
@@ -137,7 +148,8 @@ class ChromaMemoryHandler(MemoryHandler):
                 ids=[doc_id],
             )
 
-        await loop.run_in_executor(None, _store_sync)
+        from akane_den.core.runtime import run_in_db
+        await run_in_db(_store_sync)
         logger.debug(f"Memória armazenada: id={doc_id}, len={len(text)}")
 
     async def retrieve(
@@ -170,7 +182,8 @@ class ChromaMemoryHandler(MemoryHandler):
                     })
             return memories
 
-        memories = await loop.run_in_executor(None, _query_sync)
+        from akane_den.core.runtime import run_in_db
+        memories = await run_in_db(_query_sync)
         logger.debug(f"Memórias recuperadas: {len(memories)} para query='{query[:40]}'")
         return memories
 
@@ -184,7 +197,8 @@ class ChromaMemoryHandler(MemoryHandler):
             def _clear_sync():
                 self._client.delete_collection("akane_memory")
 
-            await loop.run_in_executor(None, _clear_sync)
+            from akane_den.core.runtime import run_in_db
+            await run_in_db(_clear_sync)
             logger.warning("Memória limpa completamente!")
 
     @property

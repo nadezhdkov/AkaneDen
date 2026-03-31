@@ -47,14 +47,22 @@ class PTTSkill(BaseSkill):
         """Inicia o listener de teclado em background."""
         loop = asyncio.get_running_loop()
 
+        def _on_press_thread(k):
+            try:
+                asyncio.run_coroutine_threadsafe(self._on_press(k), loop)
+            except Exception as e:
+                logger.error(f"Erro ao agendar _on_press: {e}")
+
+        def _on_release_thread(k):
+            try:
+                asyncio.run_coroutine_threadsafe(self._on_release(k), loop)
+            except Exception as e:
+                logger.error(f"Erro ao agendar _on_release: {e}")
+
         def _start_listener():
             self._listener = keyboard.Listener(
-                on_press=lambda k: loop.call_soon_threadsafe(
-                    asyncio.ensure_future, self._on_press(k)
-                ),
-                on_release=lambda k: loop.call_soon_threadsafe(
-                    asyncio.ensure_future, self._on_release(k)
-                ),
+                on_press=_on_press_thread,
+                on_release=_on_release_thread,
             )
             self._listener.daemon = True
             self._listener.start()
@@ -67,18 +75,28 @@ class PTTSkill(BaseSkill):
 
     def _is_ptt_key(self, key) -> bool:
         """Verifica se a tecla pressionada é a hotkey PTT."""
+        # Se os objetos forem idênticos (ex: Key.f2 == Key.f2)
         if self._ptt_key and key == self._ptt_key:
             return True
-        if self._ptt_key_char:
-            try:
-                return hasattr(key, "char") and key.char == self._ptt_key_char
-            except AttributeError:
-                return False
+        
+        # Se for um caractere (ex: 'v')
+        if hasattr(key, "char") and key.char:
+            if key.char.lower() == str(self.config.ptt_key).lower():
+                return True
+                
+        # Proteção extra: comparar via string representação
+        key_str = str(key).replace("Key.", "").replace("'", "").lower()
+        if key_str == str(self.config.ptt_key).lower():
+            return True
+            
         return False
 
     async def _on_press(self, key) -> None:
         """Handler de tecla pressionada."""
-        if not self._is_ptt_key(key) or self._recording:
+        if not self._is_ptt_key(key):
+            return
+
+        if self._recording:
             return
 
         self._recording = True
@@ -88,19 +106,25 @@ class PTTSkill(BaseSkill):
         if self.event_bus.has_listeners("barge_in"):
             await self.event_bus.emit("barge_in", {})
 
-        logger.debug("PTT: gravação iniciada.")
+        await self.event_bus.emit("ptt_pressed", {})
+
+        logger.info("🎤 PTT: F2 Pressionado! Gravação iniciada.")
 
         # Inicia gravação em thread separada
         loop = asyncio.get_running_loop()
-        asyncio.ensure_future(self._record_audio())
+        asyncio.create_task(self._record_audio())
 
     async def _on_release(self, key) -> None:
         """Handler de tecla solta."""
-        if not self._is_ptt_key(key) or not self._recording:
+        if not self._is_ptt_key(key):
+            return
+            
+        if not self._recording:
             return
 
         self._recording = False
-        logger.debug(f"PTT: gravação finalizada. Chunks: {len(self._audio_buffer)}")
+        await self.event_bus.emit("ptt_released", {})
+        logger.info(f"🎙 PTT: F2 Solto! Processando {len(self._audio_buffer)} chunks de áudio...")
 
         if self._audio_buffer:
             audio = np.concatenate(self._audio_buffer)
@@ -116,20 +140,39 @@ class PTTSkill(BaseSkill):
         loop = asyncio.get_running_loop()
 
         def _record_sync():
-            chunk_size = 1024
-            while self._recording:
-                try:
-                    data = sd.rec(
-                        chunk_size,
-                        samplerate=self._sample_rate,
-                        channels=1,
-                        dtype="float32",
-                        blocking=True,
-                    )
-                    self._audio_buffer.append(data.flatten())
-                except Exception as e:
-                    logger.error(f"Erro na gravação: {e}")
-                    break
+            import queue
+
+            q = queue.Queue()
+
+            def callback(indata, frames, time, status):
+                if status:
+                    logger.warning(f"Audio status: {status}")
+                if self._recording:
+                    q.put(indata.copy())
+
+            # Usa um InputStream contínuo em vez de reiniciar o sd.rec() repetidamente.
+            # sd.rec reinicia o hardware de áudio a cada chamada, o que come a maior parte do tempo.
+            try:
+                with sd.InputStream(
+                    samplerate=self._sample_rate,
+                    channels=1,
+                    dtype="float32",
+                    callback=callback,
+                ):
+                    while self._recording:
+                        # Espera passivamente até que self._recording fique False,
+                        # mas processa a fila
+                        import time
+                        time.sleep(0.01)
+                        while not q.empty():
+                            self._audio_buffer.append(q.get().flatten())
+                            
+                    # Pega o que sobrou na fila após encerrar
+                    while not q.empty():
+                        self._audio_buffer.append(q.get().flatten())
+
+            except Exception as e:
+                logger.error(f"Erro na gravação contínua: {e}")
 
         await loop.run_in_executor(None, _record_sync)
 

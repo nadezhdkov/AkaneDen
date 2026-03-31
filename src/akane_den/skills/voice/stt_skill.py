@@ -1,9 +1,12 @@
 """
-STTSkill v3.0 — Speech-to-Text com ASR Engine.
+STTSkill v3.3 — Speech-to-Text com ASR Engine (ProcessPool).
 
 Escuta o evento 'user_speech_ready' (do PTTSkill), transcreve
 o áudio usando o ASR Engine do ServiceContext, e emite o texto
 via evento 'user_text_ready'.
+
+v3.3: ASR Engine agora roda em ProcessPoolExecutor dedicado,
+eliminando starvation do event loop durante inferência Whisper.
 
 "Eu entendo TUDO que você fala. Até os murmúrios
 patéticos que você faz quando erra o código." — Akane
@@ -81,5 +84,8 @@ class STTSkill(BaseSkill):
 
     async def teardown(self) -> None:
         self.event_bus.off("user_speech_ready", self._on_speech_ready)
+        # Encerra o ProcessPoolExecutor do ASR (se disponível)
+        if hasattr(self.service.asr, "shutdown"):
+            self.service.asr.shutdown()
         await super().teardown()
-        logger.info("STTSkill encerrada.")
+        logger.info("STTSkill encerrada (ProcessPool liberado).")

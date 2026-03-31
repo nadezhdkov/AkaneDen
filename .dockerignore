@@ -1,0 +1,52 @@
+# Ambientes virtuais
+.venv/
+venv/
+env/
+.env
+
+# Dados locais
+local_chroma_db/
+chat_history/
+logs/
+models/
+screenshots/
+generated_images/
+
+# Arquivos grandes e modelos locais
+sensevoice_int8.tar.bz2
+*.tar.bz2
+*.tar.gz
+*.onnx
+
+# VCS e IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+.vs/
+
+# Build artifacts & Python
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Tokens sensíveis
+vts_token*.txt
+
+# Docs e testes
+docs/
+tests/
+test_*.py
+*.md
+!README.md
+
+# Lock files pesados
+uv.lock
+
+# OS
+.DS_Store
+Thumbs.db

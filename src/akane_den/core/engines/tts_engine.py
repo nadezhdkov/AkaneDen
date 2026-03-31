@@ -6,7 +6,11 @@ synthesize() e synthesize_to_file() assíncronos.
 
 Provedores implementados:
     - EdgeTTSEngine (default, grátis)
-    - ElevenLabsTTSEngine (premium, picos emocionais)
+    - ElevenLabsTTSEngine (premium, picos emocionais, com fallback para Edge)
+
+v3.3: ElevenLabs agora detecta erro 402 (Payment Required) e
+      faz fallback automático para Edge-TTS, garantindo que a
+      Akane nunca fique muda.
 
 "Não reclame da minha voz! O Edge é grátis e funciona. Se quiser
 emoção de verdade, pague pelo ElevenLabs, velho!" — Akane
@@ -113,18 +117,56 @@ class EdgeTTSEngine(TTSEngine):
 
 
 # ──────────────────────────────────────────────
-# Implementação: ElevenLabs (Premium)
+# Implementação: ElevenLabs (Premium, com Fallback)
 # ──────────────────────────────────────────────
 
 
+def _is_payment_error(exc: Exception) -> bool:
+    """Detecta se a exceção é um erro 402 (Payment Required) do ElevenLabs.
+
+    Verifica:
+    - status_code == 402 no objeto de exceção
+    - "paid_plan_required" na mensagem de erro
+    - "402" na representação string da exceção
+
+    Returns:
+        True se for um erro de pagamento/plano.
+    """
+    # Checa atributo status_code direto
+    if hasattr(exc, "status_code") and exc.status_code == 402:
+        return True
+
+    # Checa body/message para a string do erro
+    error_str = str(exc).lower()
+    if "paid_plan_required" in error_str:
+        return True
+    if "402" in error_str and ("payment" in error_str or "paid" in error_str):
+        return True
+
+    # Checa nested response se existir
+    if hasattr(exc, "response") and hasattr(exc.response, "status_code"):
+        if exc.response.status_code == 402:
+            return True
+
+    return False
+
+
 class ElevenLabsTTSEngine(TTSEngine):
-    """TTS Engine usando ElevenLabs API (premium, alta qualidade emocional)."""
+    """TTS Engine usando ElevenLabs API (premium, alta qualidade emocional).
+
+    v3.3: Fallback automático para Edge-TTS quando o ElevenLabs retorna
+    erro 402 (Payment Required), garantindo que a Akane nunca fique muda.
+    """
 
     def __init__(self, config: AkaneConfig) -> None:
         super().__init__(config)
         self._voice_id = config.tts.elevenlabs_voice_id
         self._model_id = config.tts.elevenlabs_model
         self._client = None
+        self._paid_restricted = False
+
+        # Fallback: instancia Edge-TTS para emergências
+        self._edge_fallback = EdgeTTSEngine(config)
 
         api_key = os.environ.get("ELEVENLABS_API_KEY")
         if api_key:
@@ -134,7 +176,8 @@ class ElevenLabsTTSEngine(TTSEngine):
                 self._client = ElevenLabs(api_key=api_key)
                 logger.info(
                     f"ElevenLabsTTSEngine inicializado: "
-                    f"voice_id={self._voice_id}"
+                    f"voice_id={self._voice_id} "
+                    f"(Edge-TTS fallback pronto)"
                 )
             except ImportError:
                 logger.warning("Pacote 'elevenlabs' não instalado.")
@@ -146,13 +189,14 @@ class ElevenLabsTTSEngine(TTSEngine):
 
     @property
     def is_available(self) -> bool:
-        """Verifica se o cliente ElevenLabs está ativo."""
-        return self._client is not None
+        """Verifica se o cliente ElevenLabs está ativo e não bloqueado."""
+        return self._client is not None and not self._paid_restricted
 
     async def synthesize(self, text: str) -> bytes:
-        """Sintetiza texto completo com ElevenLabs."""
-        if not self._client:
-            raise RuntimeError("ElevenLabs não inicializado.")
+        """Sintetiza texto com ElevenLabs, com fallback para Edge-TTS."""
+        if not self._client or self._paid_restricted:
+            logger.debug("ElevenLabs indisponível, usando Edge-TTS fallback.")
+            return await self._edge_fallback.synthesize(text)
 
         import asyncio
 
@@ -167,19 +211,47 @@ class ElevenLabsTTSEngine(TTSEngine):
             )
             return b"".join(audio_gen)
 
-        return await loop.run_in_executor(None, _sync_synthesize)
+        try:
+            return await loop.run_in_executor(None, _sync_synthesize)
+        except Exception as e:
+            if _is_payment_error(e):
+                logger.warning(
+                    f"⚠ ElevenLabs 402 (Payment Required)! "
+                    f"Voz '{self._voice_id}' requer plano pago. "
+                    f"Fallback automático para Edge-TTS."
+                )
+                self._paid_restricted = True
+                return await self._edge_fallback.synthesize(text)
+            raise  # Re-raise erros não-402
 
     async def synthesize_to_file(self, text: str, output_path: str) -> str:
-        """Sintetiza e salva em arquivo MP3."""
-        audio = await self.synthesize(text)
-        with open(output_path, "wb") as f:
-            f.write(audio)
-        return output_path
+        """Sintetiza e salva em arquivo MP3, com fallback para Edge-TTS."""
+        if not self._client or self._paid_restricted:
+            logger.debug("ElevenLabs indisponível, usando Edge-TTS fallback.")
+            return await self._edge_fallback.synthesize_to_file(text, output_path)
+
+        try:
+            audio = await self.synthesize(text)
+            with open(output_path, "wb") as f:
+                f.write(audio)
+            return output_path
+        except Exception as e:
+            if _is_payment_error(e):
+                logger.warning(
+                    f"⚠ ElevenLabs 402 em synthesize_to_file! "
+                    f"Fallback para Edge-TTS."
+                )
+                self._paid_restricted = True
+                return await self._edge_fallback.synthesize_to_file(text, output_path)
+            raise
 
     async def synthesize_stream(self, text: str) -> AsyncIterator[bytes]:
-        """Streaming de chunks do ElevenLabs."""
-        if not self._client:
-            raise RuntimeError("ElevenLabs não inicializado.")
+        """Streaming de chunks do ElevenLabs, com fallback para Edge-TTS."""
+        if not self._client or self._paid_restricted:
+            logger.debug("ElevenLabs indisponível, usando Edge-TTS fallback.")
+            async for chunk in self._edge_fallback.synthesize_stream(text):
+                yield chunk
+            return
 
         import asyncio
 
@@ -195,10 +267,24 @@ class ElevenLabsTTSEngine(TTSEngine):
                 )
             )
 
-        chunks = await loop.run_in_executor(None, _sync_stream)
-        for chunk in chunks:
-            yield chunk
+        try:
+            chunks = await loop.run_in_executor(None, _sync_stream)
+            for chunk in chunks:
+                yield chunk
+        except Exception as e:
+            if _is_payment_error(e):
+                logger.warning(
+                    f"⚠ ElevenLabs 402 em synthesize_stream! "
+                    f"Fallback para Edge-TTS."
+                )
+                self._paid_restricted = True
+                async for chunk in self._edge_fallback.synthesize_stream(text):
+                    yield chunk
+            else:
+                raise
 
     @property
     def engine_name(self) -> str:
+        if self._paid_restricted:
+            return "elevenlabs→edge(fallback)"
         return "elevenlabs"

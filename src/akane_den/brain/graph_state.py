@@ -6,6 +6,7 @@ Refatorado na v3.0 para:
 2. Suportar streaming de resposta (sentença por sentença)
 3. Integrar MCP tools e memória de longo prazo
 4. Ser totalmente assíncrono (sem brain.invoke() bloqueante)
+5. [v3.5] Persistência de chat via SQLite (ChatHistoryManager)
 
 "Meu cérebro agora PENSA e FALA ao mesmo tempo. Enquanto eu
 processo o próximo argumento pra te xingar, a primeira frase
@@ -40,6 +41,7 @@ class AkaneBrain:
         self._emotion_analyzer = EmotionAnalyzer(service.persona)
         self._tools: list = []
         self._memory = None
+        self._session_id: str | None = None
 
     async def setup(self, tools: list | None = None, memory=None) -> None:
         """Inicializa o brain com ferramentas e memória.
@@ -54,6 +56,26 @@ class AkaneBrain:
         if self._tools:
             self.service.llm.bind_tools(self._tools)
             logger.info(f"Brain equipado com {len(self._tools)} ferramentas.")
+
+        # Restaura histórico persistente (SQLite)
+        chat_history = self.service.chat_history
+        if chat_history:
+            try:
+                self._session_id = await chat_history.get_or_create_session(
+                    persona=self.service.config.persona
+                )
+                saved_msgs = await chat_history.get_langchain_messages(
+                    self._session_id,
+                    limit=self.service.config.brain.max_history,
+                )
+                if saved_msgs:
+                    self._history = saved_msgs
+                    logger.info(
+                        f"Histórico restaurado: {len(saved_msgs) // 2} turnos "
+                        f"(sessão {self._session_id})"
+                    )
+            except Exception as e:
+                logger.warning(f"Erro ao restaurar histórico: {e}")
 
         logger.info("AkaneBrain inicializado e pronto.")
 
@@ -186,6 +208,16 @@ class AkaneBrain:
             sentence_separators = (".", "!", "?", "…")
 
             async for chunk in self.service.llm.chat_stream(messages, self._tools):
+                if isinstance(chunk, list):
+                    logger.info(f"Tool calls detectados via streaming: {len(chunk)}")
+                    from langchain_core.messages import AIMessage
+                    tool_msg = AIMessage(content="", tool_calls=chunk)
+                    final_text = await self._handle_tool_calls(tool_msg, messages)
+                    if final_text:
+                        sentence_buffer += final_text
+                        full_response += final_text
+                    continue
+
                 sentence_buffer += chunk
                 full_response += chunk
 
@@ -287,7 +319,10 @@ class AkaneBrain:
         return str(response)
 
     def _update_history(self, user_text: str, response_text: str) -> None:
-        """Atualiza o histórico de conversação (com limite do config)."""
+        """Atualiza o histórico de conversação (com limite do config).
+
+        v3.5: Também persiste no SQLite via ChatHistoryManager.
+        """
         self._history.append(HumanMessage(content=user_text))
         self._history.append(AIMessage(content=response_text))
 
@@ -295,6 +330,22 @@ class AkaneBrain:
         if len(self._history) > max_history * 2:
             self._history = self._history[-(max_history * 2):]
             logger.debug(f"Histórico truncado para {max_history} turnos.")
+
+        # Persiste no SQLite (fire-and-forget)
+        chat_history = self.service.chat_history
+        if chat_history and self._session_id:
+            async def _persist():
+                try:
+                    await chat_history.add_message(
+                        self._session_id, "user", user_text
+                    )
+                    await chat_history.add_message(
+                        self._session_id, "assistant", response_text
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao persistir chat: {e}")
+
+            asyncio.create_task(_persist())
 
     async def _retrieve_memories(self, query: str) -> list[str] | None:
         """Recupera memórias relevantes para contextualizar a resposta."""
@@ -336,3 +387,8 @@ class AkaneBrain:
     @property
     def history_length(self) -> int:
         return len(self._history) // 2
+
+    @property
+    def session_id(self) -> str | None:
+        """ID da sessão de chat persistente ativa."""
+        return self._session_id

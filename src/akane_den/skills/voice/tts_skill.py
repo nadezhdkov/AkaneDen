@@ -68,12 +68,9 @@ class TTSSkill(BaseSkill):
         tts = self.service.get_active_tts(emotion, score)
 
         try:
-            # Gera arquivo de áudio temporário
-            output_path = os.path.join(
-                tempfile.gettempdir(),
-                f"akane_tts_{int(time.time())}.mp3",
-            )
-            await tts.synthesize_to_file(text, output_path)
+            from pathlib import Path
+            output_path = Path(tempfile.gettempdir()) / f"akane_tts_{int(time.time())}.mp3"
+            await tts.synthesize_to_file(text, str(output_path))
 
             # Emite evento de início de fala (para LipSync)
             await self.event_bus.emit("tts_speaking_start", {
@@ -135,12 +132,9 @@ class TTSSkill(BaseSkill):
 
                 start = time.monotonic()
 
-                # Sintetiza a sentença
-                output_path = os.path.join(
-                    tempfile.gettempdir(),
-                    f"akane_stream_{int(time.time() * 1000)}.mp3",
-                )
-                await tts.synthesize_to_file(sentence, output_path)
+                from pathlib import Path
+                output_path = Path(tempfile.gettempdir()) / f"akane_stream_{int(time.time() * 1000)}.mp3"
+                await tts.synthesize_to_file(sentence, str(output_path))
 
                 elapsed = time.monotonic() - start
 
@@ -192,8 +186,14 @@ class TTSSkill(BaseSkill):
                 logger.error(f"Erro no playback: {e}")
 
     async def _play_audio(self, path: str) -> None:
-        """Reproduz arquivo de áudio via pygame (non-blocking)."""
+        """Reproduz arquivo de áudio via pygame (non-blocking).
+
+        IMPORTANTE: Usa time.sleep() em vez de pygame.time.wait()
+        porque time.sleep() LIBERA o GIL, enquanto pygame.time.wait()
+        segura o GIL durante toda a espera, causando starvation.
+        """
         import pygame
+        import time as _time
 
         loop = asyncio.get_running_loop()
 
@@ -202,7 +202,7 @@ class TTSSkill(BaseSkill):
                 pygame.mixer.music.load(path)
                 pygame.mixer.music.play()
                 while pygame.mixer.music.get_busy():
-                    pygame.time.wait(50)
+                    _time.sleep(0.05)  # Libera o GIL! (pygame.time.wait NÃO libera)
             except Exception as e:
                 logger.error(f"Erro no pygame playback: {e}")
 

@@ -32,8 +32,10 @@ logger.add(
 )
 
 # Arquivo rotativo: debug completo para diagnóstico
+from akane_den.core.paths import get_log_dir
+
 logger.add(
-    "logs/akane_{time:YYYY-MM-DD}.log",
+    str(get_log_dir() / "akane_{time:YYYY-MM-DD}.log"),
     rotation="10 MB",
     retention="7 days",
     compression="gz",

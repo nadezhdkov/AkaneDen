@@ -2,14 +2,17 @@
 ServiceContext — Contêiner de Injeção de Dependência.
 
 O ServiceContext é o coração da arquitetura Shogun v3.0. Ele centraliza
-todas as instâncias ativas de motores de IA (LLM, TTS, ASR), o EventBus,
-e o config tipado. Skills recebem o ServiceContext no construtor em vez
-de parâmetros avulsos.
+todas as instâncias ativas de motores de IA (LLM, TTS, ASR, VAD),
+o EventBus, ChatHistory, e o config tipado.
+
+v3.5: Adicionado VAD, ChatHistoryManager, e reload_config() para
+hot-swap de personagem/config em runtime.
 
 Benefícios:
     - Troca de provedores sem alterar skills
     - Uma única fonte de verdade para dependências
     - Setup/teardown centralizado
+    - Hot-swap de config sem restart
     - Facilita testes com mock de engines
 
 "Eu sou o CONTEXTO. Tudo passa por mim. Se alguma skill tentar
@@ -36,8 +39,8 @@ from akane_den.core.models.persona import PersonaProfile
 class ServiceContext:
     """Contêiner de dependências para cada sessão da Akane.
 
-    Centraliza as instâncias ativas de LLM, ASR, TTS, EventBus e config.
-    Skills recebem o ServiceContext no construtor em vez de config+bus separados.
+    Centraliza as instâncias ativas de LLM, ASR, TTS, VAD, EventBus,
+    ChatHistory e config. Skills recebem o ServiceContext no construtor.
 
     Uso:
         config = load_config()
@@ -56,6 +59,10 @@ class ServiceContext:
     persona: PersonaProfile
     # Motor TTS emocional (ElevenLabs) — pode ser None
     tts_emotional: ElevenLabsTTSEngine | None = None
+    # VAD (Voice Activity Detection) — None se desativado
+    vad: object | None = None
+    # Chat History Manager — None se não configurado
+    chat_history: object | None = None
 
     @classmethod
     async def create(cls, config: AkaneConfig) -> ServiceContext:
@@ -110,6 +117,23 @@ class ServiceContext:
         asr = EngineFactory.create_asr(config)
         await asr.setup()
 
+        # ── VAD Engine (opcional, desativado por padrão) ──
+        vad = EngineFactory.create_vad(config)
+        if vad is not None:
+            await vad.setup()
+            logger.info(f"  VAD: {vad.engine_name}")
+
+        # ── Chat History (SQLite) ──
+        chat_history = None
+        try:
+            from akane_den.core.chat_history import ChatHistoryManager
+
+            chat_history = ChatHistoryManager()
+            await chat_history.setup()
+        except Exception as e:
+            logger.warning(f"ChatHistory não inicializado: {e}")
+            chat_history = None
+
         context = cls(
             config=config,
             event_bus=event_bus,
@@ -118,6 +142,8 @@ class ServiceContext:
             asr=asr,
             persona=profile,
             tts_emotional=tts_emotional,
+            vad=vad,
+            chat_history=chat_history,
         )
 
         logger.success("ServiceContext criado com sucesso!")
@@ -128,8 +154,71 @@ class ServiceContext:
             f"{'ElevenLabs' if tts_emotional else 'Nenhum'}"
         )
         logger.info(f"  ASR: {asr.engine_name}")
+        logger.info(f"  VAD: {vad.engine_name if vad else 'Desativado (PTT primário)'}")
+        logger.info(f"  ChatHistory: {'SQLite' if chat_history else 'Desativado'}")
 
         return context
+
+    async def reload_config(self, new_config: AkaneConfig) -> None:
+        """Hot-swap de configuração sem restart completo.
+
+        Só reinicializa engines cujo config mudou.
+        Usado pelo Web Dashboard para troca de persona/provider.
+
+        Args:
+            new_config: Nova configuração validada.
+        """
+        logger.info("Hot-swap de configuração iniciado...")
+        changes = []
+
+        # ── LLM ──
+        if new_config.brain != self.config.brain:
+            self.llm = EngineFactory.create_llm(new_config)
+            changes.append(f"LLM → {self.llm.model_name}")
+
+        # ── TTS ──
+        if new_config.tts != self.config.tts:
+            self.tts = EngineFactory.create_tts(new_config)
+            changes.append(f"TTS → {self.tts.engine_name}")
+
+            # Atualiza emocional se necessário
+            if new_config.tts.default_engine != "elevenlabs":
+                try:
+                    self.tts_emotional = EngineFactory.create_elevenlabs_tts(new_config)
+                    if not self.tts_emotional.is_available:
+                        self.tts_emotional = None
+                except Exception:
+                    self.tts_emotional = None
+
+        # ── ASR ──
+        if new_config.asr != self.config.asr:
+            if hasattr(self.asr, 'shutdown'):
+                self.asr.shutdown()
+            self.asr = EngineFactory.create_asr(new_config)
+            await self.asr.setup()
+            changes.append(f"ASR → {self.asr.engine_name}")
+
+        # ── VAD ──
+        if new_config.vad != self.config.vad:
+            if self.vad and hasattr(self.vad, 'shutdown'):
+                self.vad.shutdown()
+            self.vad = EngineFactory.create_vad(new_config)
+            if self.vad is not None:
+                await self.vad.setup()
+            changes.append(f"VAD → {self.vad.engine_name if self.vad else 'off'}")
+
+        # ── Persona ──
+        if new_config.persona != self.config.persona:
+            pm = PersonaManager()
+            self.persona = pm.load_persona(new_config.persona)
+            changes.append(f"Persona → {new_config.persona}")
+
+        self.config = new_config
+
+        if changes:
+            logger.success(f"Hot-swap concluído: {', '.join(changes)}")
+        else:
+            logger.info("Hot-swap: nenhuma mudança detectada.")
 
     def get_active_tts(self, emotion: str = "neutro", score: float = 0.0) -> TTSEngine:
         """Retorna o motor TTS adequado baseado na emoção.
@@ -164,5 +253,6 @@ class ServiceContext:
             f"<ServiceContext "
             f"llm={self.llm.model_name} "
             f"tts={self.tts.engine_name} "
-            f"asr={self.asr.engine_name}>"
+            f"asr={self.asr.engine_name} "
+            f"vad={'on' if self.vad else 'off'}>"
         )

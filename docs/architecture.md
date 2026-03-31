@@ -1,48 +1,51 @@
-# Arquitetura Shogun Async — AkaneDen v3.0
+# Arquitetura Shogun Async — AkaneDen v3.5
 
 ## Visão Geral
 
-O AkaneDen v3.0 utiliza a **Arquitetura Shogun Async**, um padrão modular fortemente tipado e 100% assíncrono. O `ServiceContext` atua como Container de Injeção de Dependências, gerenciando os provedores (motores) escolhidos no YAML de configuração. Um `SkillManager` central continua gerenciando o ciclo de vida das **Skills** independentes.
+O AkaneDen v3.5 utiliza a **Arquitetura Shogun Async**, um padrão modular fortemente tipado e 100% assíncrono. O `ServiceContext` atua como Container de Injeção de Dependências, gerenciando os provedores (motores) escolhidos no YAML de configuração. A grande adição da v3.5 é o **Dashboard Web (FastAPI)** rodando em paralelo no Event Loop e as Skills de **Proatividade** e **Live Streaming (Twitch)**.
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                   main.py (Orquestrador Async)               │
-│                                                             │
-│  ┌─────────────────┐   ┌──────────────────────────────┐    │
-│  │   ConfigLoader  │   │        EngineFactory         │    │
-│  │  (Pydantic v2)  │───▶   (Registro Dinâmico)        │    │
-│  └─────────────────┘   └──────────────────────────────┘    │
-│                                 │                           │
-│  ┌──────────────────────────────▼────────────────────────┐ │
-│  │                      ServiceContext                     │ │
-│  │     [LLM_Engine]   [TTS_Engine]   [ASR_Engine]          │ │
-│  └──────────────────────────────┬────────────────────────┘ │
-│                                 │                           │
-│  ┌──────────────────────────────▼────────────────────────┐ │
-│  │                        SkillManager                     │ │
-│  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌────────┐ ┌───────┐         │ │
-│  │  │ PTT │ │ STT │ │ TTS │ │ Vision │ │ VTube │ ...     │ │
-│  │  └─────┘ └─────┘ └─────┘ └────────┘ └───────┘         │ │
-│  └───────────────────────────────────────────────────────┘ │
-│                                                             │
-│  ┌───────────────────────────────────────────────────────┐ │
-│  │                LangGraph Brain & Agent                 │ │
-│  │  ┌──────────┐ ┌────────┐ ┌─────────┐ ┌─────────────┐  │ │
-│  │  │Persona + │ │Emotion │ │ ChromaDB│ │ MCP Tools   │  │ │
-│  │  │Streaming │ │Analyzer│ │ Memory  │ │  (Stagehand,│  │ │
-│  │  └──────────┘ └────────┘ └─────────┘ │  Web Search)│  │ │
-│  │                                      └─────────────┘  │ │
-│  └───────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                   main.py (Orquestrador Async)                 │
+│                                                               │
+│                   ┌──────────────────────┐                    │
+│                   │ Web Dashboard Server │                    │
+│                   │ (FastAPI + SSE Logs) │                    │
+│                   └──────────┬───────────┘                    │
+│                              │ (Hot-Swap Config)              │
+│  ┌─────────────────┐   ┌─────▼────────────────────────┐       │
+│  │   ConfigLoader  │   │        EngineFactory         │       │
+│  │  (Pydantic v2)  │───▶   (Registro Dinâmico)        │       │
+│  └─────────────────┘   └──────────────────────────────┘       │
+│                                 │                             │
+│  ┌──────────────────────────────▼──────────────────────────┐  │
+│  │                      ServiceContext                     │  │
+│  │     [LLM_Engine]   [TTS_Engine]   [ASR_Engine]          │  │
+│  └──────────────────────────────┬──────────────────────────┘  │
+│                                 │                             │
+│  ┌──────────────────────────────▼──────────────────────────┐  │
+│  │                        SkillManager                     │  │
+│  │  ┌─────┐ ┌─────┐ ┌──────┐ ┌─────────┐ ┌─────────┐       │  │
+│  │  │ PTT │ │ STT │ │Vision│ │Proactive│ │Twitch   │ ...   │  │
+│  │  └─────┘ └─────┘ └──────┘ └─────────┘ └─────────┘       │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │                LangGraph Brain & Agent                   │  │
+│  │  ┌──────────┐ ┌────────┐ ┌─────────┐ ┌─────────────┐    │  │
+│  │  │Persona + │ │Emotion │ │ SQLite &│ │ MCP Tools   │    │  │
+│  │  │Streaming │ │Analyzer│ │ ChromaDB│ │  (Web/OS)   │    │  │
+│  │  └──────────┘ └────────┘ └─────────┘ └─────────────┘    │  │
+│  └─────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Componentes Core (v3.0)
+## Componentes Core (v3.5)
 
 ### Configuração Estrita (Pydantic)
-Em vez de dicionários soltos, configurações são lidas em `AkaneConfig`, dividido em:
-- `BrainConfig`, `VoiceConfig` (tts/asr), `VisionConfig`, `VTubeConfig`, `MCPConfig`, `MemoryConfig`.
+Em vez de dicionários soltos, configurações são lidas em `AkaneConfig`, dividido em dezenas de submódulos (`DashboardConfig`, `TwitchConfig`, `BrainConfig`, etc...).
 
 ### ServiceContext & EngineFactory
 A **EngineFactory** registra os Motores base:
@@ -101,7 +104,12 @@ sequenceDiagram
 
 ---
 
-## Agentic AI: MCP e Memória
+## Agentic AI: Proatividade e Memória
 
-- **MCPHandler**: Inicializado no ciclo do ServiceContext, registra ferramentas padrões do Model Context Protocol. Isso dá ao Brain a capacidade de pesquisar no DuckDuckGo, ler páginas da web (Stagehand) e automatizar o sistema operacional (PyAutoGUI, OS).
-- **MemoryHandler**: ChromaDB embutido por padrão que persiste o hitórico do LangGraph na rota `/local_chroma_db`. Quando o boot ocorre, restaura o contexto vitalícia (caso a flag de memória seja ativada). O handler possui interface já designada para compatibilidade futura com Letta/MemGPT.
+- **ProactiveSpeakSkill**: Monitora silenciosamente a ausência de eventos na sessão. Após `timeout` (ex: 5 minutos), injeta um comando oculto no Event Loop engatilhando o Brain para falar sozinho: `"Responda proativamente por causa do silêncio"`.
+- **Async Zero-Latency Vision**: A skill de tela captura snapshots silenciosos por trás dos panos, mantendo um cache. Quando o usuário fala, o modelo já tem o frame mais recente em 0 milissegundos, não trancando mais a thread de inferência.
+- **FastAPI Dashboard**: Um servidor em thread separada provê UI control, `EventSource` (SSE) para streamar logs nativos do sistema diretamente para o front, e aciona Mutexes que trocam as Personas da memória viva.
+- **MCPHandler**: Inicializado no ciclo do ServiceContext, registra ferramentas padrões do Model Context Protocol (DuckDuckGo, Local Browsing).
+- **Memória em Tiers**: 
+  - **Tier 1 (Working)**: SQLite encapsulando o `ChatHistoryManager` garante que as 50 conversas passadas continuem disponíveis entre reboots, de forma extremamente leve.
+  - **Tier 2 (Episodic)**: ChromaDB (se ligado) continua extraindo memórias não temporais.

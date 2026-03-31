@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AkaneDen — Painel de Controle</title>
+    <meta name="description" content="Painel de configuração do AkaneDen VTuber AI Assistant">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════
+           AkaneDen Dashboard — Design System
+           ═══════════════════════════════════════════ */
+
+        :root {
+            --bg-base: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a28;
+            --bg-input: #0e0e16;
+            --bg-surface: #16161f;
+            --border: #2a2a3a;
+            --border-focus: #e74c6f;
+
+            --text-primary: #eaeaf0;
+            --text-secondary: #8888a0;
+            --text-muted: #5a5a72;
+
+            --accent-pink: #e74c6f;
+            --accent-pink-dim: #e74c6f33;
+            --accent-purple: #9b59e0;
+            --accent-purple-dim: #9b59e033;
+            --accent-blue: #4c8ce7;
+            --accent-green: #4ce79b;
+            --accent-amber: #e7c04c;
+            --accent-red: #e74c4c;
+
+            --gradient-hero: linear-gradient(135deg, #e74c6f 0%, #9b59e0 50%, #4c8ce7 100%);
+            --gradient-card: linear-gradient(135deg, #12121a 0%, #1a1a28 100%);
+
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+
+            --shadow-card: 0 4px 20px rgba(0,0,0,0.3);
+            --shadow-hover: 0 8px 32px rgba(231,76,111,0.15);
+            --shadow-glow: 0 0 40px rgba(231,76,111,0.1);
+
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* ── Ambient Glow ── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -200px;
+            right: -200px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(231,76,111,0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -200px;
+            left: -200px;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(155,89,224,0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Header ── */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10,10,15,0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+        }
+
+        .header-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--gradient-hero);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            background: rgba(76,231,155,0.1);
+            border: 1px solid rgba(76,231,155,0.2);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--accent-green);
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s ease infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(76,231,155,0.4); }
+            50% { opacity: 0.8; box-shadow: 0 0 0 6px rgba(76,231,155,0); }
+        }
+
+        /* ── Nav Tabs ── */
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0 32px;
+            background: rgba(10,10,15,0.6);
+            border-bottom: 1px solid var(--border);
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .nav-tab.active {
+            color: var(--accent-pink);
+            border-bottom-color: var(--accent-pink);
+        }
+
+        /* ── Main Layout ── */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 32px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Panel ── */
+        .panel {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .panel.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-header {
+            margin-bottom: 24px;
+        }
+
+        .panel-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .panel-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 20px;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            border-color: var(--accent-pink-dim);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .card-icon.pink { background: var(--accent-pink-dim); }
+        .card-icon.purple { background: var(--accent-purple-dim); }
+        .card-icon.blue { background: rgba(76,140,231,0.15); }
+        .card-icon.green { background: rgba(76,231,155,0.15); }
+        .card-icon.amber { background: rgba(231,192,76,0.15); }
+
+        /* ── Grid ── */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        /* ── Form Elements ── */
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            transition: var(--transition);
+            outline: none;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 0 3px var(--accent-pink-dim);
+        }
+
+        .form-select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238888a0' viewBox='0 0 16 16'%3E%3Cpath d='M8 12L2 6h12z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 24px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-primary {
+            background: var(--gradient-hero);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(231,76,111,0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-pink);
+            background: var(--bg-card-hover);
+        }
+
+        .btn-danger {
+            background: rgba(231,76,76,0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(231,76,76,0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(231,76,76,0.25);
+        }
+
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 12px;
+        }
+
+        /* ── Toast ── */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            padding: 14px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--accent-green);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow-card);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: var(--transition);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error { border-color: var(--accent-red); }
+
+        /* ── Persona Card ── */
+        .persona-card {
+            padding: 18px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--transition);
+        }
+
+        .persona-card:hover {
+            border-color: var(--accent-purple-dim);
+        }
+
+        .persona-card.active-persona {
+            border-color: var(--accent-pink);
+            background: rgba(231,76,111,0.05);
+        }
+
+        .persona-info h4 {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .persona-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        /* ── Key Row ── */
+        .key-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 0;
+            border-bottom: 1px solid rgba(42,42,58,0.5);
+        }
+
+        .key-row:last-child { border-bottom: none; }
+
+        .key-name {
+            font-size: 13px;
+            font-weight: 600;
+            min-width: 180px;
+            font-family: 'Courier New', monospace;
+            color: var(--accent-blue);
+        }
+
+        .key-status {
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .key-status.set {
+            background: rgba(76,231,155,0.12);
+            color: var(--accent-green);
+        }
+
+        .key-status.unset {
+            background: rgba(231,76,76,0.12);
+            color: var(--accent-red);
+        }
+
+        .key-input {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .key-input:focus {
+            border-color: var(--accent-pink);
+        }
+
+        /* ── Slider ── */
+        input[type="range"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-input);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-pink);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(231,76,111,0.4);
+        }
+
+        .slider-value {
+            font-size: 13px;
+            color: var(--accent-pink);
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .main { padding: 16px; }
+            .grid-2 { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .header-inner { padding: 0 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ Header ═══ -->
+<header class="header">
+    <div class="header-inner">
+        <div class="logo">
+            <div class="logo-icon">🏯</div>
+            <span class="logo-text">AkaneDen Dashboard</span>
+        </div>
+        <div class="status-badge" id="statusBadge">
+            <div class="status-dot"></div>
+            <span>Sistema Online</span>
+        </div>
+    </div>
+</header>
+
+<!-- ═══ Nav ═══ -->
+<nav class="nav-tabs" id="navTabs">
+    <button class="nav-tab" data-panel="config" id="tab-config">⚙️ Configuração</button>
+    <button class="nav-tab" data-panel="personas" id="tab-personas">🎭 Personas</button>
+    <button class="nav-tab" data-panel="keys" id="tab-keys">🔑 API Keys</button>
+    <button class="nav-tab" data-panel="logs" id="tab-logs">📡 Logs & Telemetria</button>
+    <button class="nav-tab" data-panel="about" id="tab-about">📊 Status</button>
+</nav>
+
+<!-- ═══ Main ═══ -->
+<main class="main">
+
+    <!-- ── Panel: Logs & Telemetria ── -->
+    <section class="panel" id="panel-logs">
+        <div class="panel-header">
+            <h1 class="panel-title">📡 Logs & Telemetria do Sistema</h1>
+            <p class="panel-subtitle">Acompanhe a atividade neural de Akane em tempo real.</p>
+        </div>
+        
+        <div class="card" style="margin-bottom: 20px;">
+            <div class="card-title">
+                <div class="card-icon blue">⏱️</div>
+                Métricas (Simuladas)
+            </div>
+            <div style="display: flex; gap: 24px;">
+                <div>
+                    <strong style="color:var(--text-secondary)">Latência LLM:</strong> <span style="color:var(--accent-pink)">~750ms</span>
+                </div>
+                <div>
+                    <strong style="color:var(--text-secondary)">Latência TTS:</strong> <span style="color:var(--accent-pink)">~1200ms</span>
+                </div>
+                <div>
+                    <strong style="color:var(--text-secondary)">Uso de Memória:</strong> <span style="color:var(--accent-pink)">124MB</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="height: 500px; display: flex; flex-direction: column;">
+            <div class="card-title">
+                <div class="card-icon pink">📜</div>
+                Live Event Stream
+            </div>
+            <div id="logs-container" style="flex: 1; background: #000; border-radius: 6px; padding: 12px; overflow-y: auto; font-family: monospace; font-size: 13px; border: 1px solid var(--border);">
+                <!-- Logs will be injected here via SSE -->
+                <div style="color: #666;">Aguardando conexão com SSE...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Panel: Config ── -->
+    <section class="panel active" id="panel-config">
+        <div class="panel-header">
+            <h1 class="panel-title">⚙️ Configuração do Sistema</h1>
+            <p class="panel-subtitle">Edite o config.yaml sem precisar abrir um editor de texto. As alterações são salvas automaticamente.</p>
+        </div>
+
+        <div class="grid-2">
+            <!-- Brain -->
+            <div class="card" id="card-brain">
+                <div class="card-title">
+                    <div class="card-icon purple">🧠</div>
+                    Cérebro (LLM)
+                </div>
+                <p class="card-description">Motor de linguagem e parâmetros de geração.</p>
+
+                <div class="form-group">
+                    <label class="form-label">Provider</label>
+                    <select class="form-select" id="brain-provider">
+                        <option value="gemini">Google Gemini</option>
+                        <option value="groq">Groq</option>
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Temperatura</label>
+                    <div class="slider-row">
+                        <input type="range" id="brain-temperature" min="0" max="2" step="0.1" value="0.8">
+                        <span class="slider-value" id="brain-temperature-val">0.8</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Histórico Máximo (turnos)</label>
+                    <input type="number" class="form-input" id="brain-max-history" value="40" min="5" max="500">
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveSection('brain')">Salvar Cérebro</button>
+            </div>
+
+            <!-- TTS -->
+            <div class="card" id="card-tts">
+                <div class="card-title">
+                    <div class="card-icon pink">🔊</div>
+                    Voz (TTS)
+                </div>
+                <p class="card-description">Motor de síntese de voz e configuração emocional.</p>
+
+                <div class="form-group">
+                    <label class="form-label">Motor Padrão</label>
+                    <select class="form-select" id="tts-engine">
+                        <option value="edge">Edge TTS (Grátis)</option>
+                        <option value="elevenlabs">ElevenLabs (Premium)</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Edge Voice</label>
+                        <input type="text" class="form-input" id="tts-edge-voice" value="pt-BR-ThalitaNeural">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">ElevenLabs Voice ID</label>
+                        <input type="text" class="form-input" id="tts-elevenlabs-id" value="">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Threshold Emoção (ElevenLabs)</label>
+                    <div class="slider-row">
+                        <input type="range" id="tts-emotion-threshold" min="0" max="1" step="0.05" value="0.7">
+                        <span class="slider-value" id="tts-emotion-val">0.70</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveSection('tts')">Salvar Voz</button>
+            </div>
+
+            <!-- ASR -->
+            <div class="card" id="card-asr">
+                <div class="card-title">
+                    <div class="card-icon blue">🎤</div>
+                    Reconhecimento de Fala (ASR)
+                </div>
+                <p class="card-description">Motor de speech-to-text e configurações de captura.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Provider</label>
+                        <select class="form-select" id="asr-provider">
+                            <option value="whisper">Faster-Whisper (Local)</option>
+                            <option value="sherpa">Sherpa-ONNX (Local)</option>
+                            <option value="groq_whisper">Groq Whisper (API)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Model Size</label>
+                        <select class="form-select" id="asr-model-size">
+                            <option value="tiny">Tiny</option>
+                            <option value="small">Small</option>
+                            <option value="medium">Medium</option>
+                            <option value="large">Large</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Dispositivo</label>
+                        <select class="form-select" id="asr-device">
+                            <option value="cpu">CPU</option>
+                            <option value="cuda">CUDA (GPU)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Idioma</label>
+                        <input type="text" class="form-input" id="asr-language" value="pt">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveSection('asr')">Salvar ASR</button>
+            </div>
+
+            <!-- Input & VAD -->
+            <div class="card" id="card-input">
+                <div class="card-title">
+                    <div class="card-icon green">🎯</div>
+                    Input & VAD
+                </div>
+                <p class="card-description">Modo de entrada de voz. PTT é o modo primário.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Modo de Input</label>
+                        <select class="form-select" id="input-mode">
+                            <option value="ptt">PTT (Push-to-Talk)</option>
+                            <option value="vad">VAD (Voice Activity)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tecla PTT</label>
+                        <input type="text" class="form-input" id="ptt-key" value="f2">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">VAD Threshold</label>
+                    <div class="slider-row">
+                        <input type="range" id="vad-threshold" min="0.1" max="0.9" step="0.05" value="0.5">
+                        <span class="slider-value" id="vad-threshold-val">0.50</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveInputConfig()">Salvar Input</button>
+            </div>
+
+            <!-- Vision -->
+            <div class="card" id="card-vision">
+                <div class="card-title">
+                    <div class="card-icon amber">👁️</div>
+                    Visão
+                </div>
+                <p class="card-description">Captura de tela e contexto visual.</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Ativada</label>
+                        <select class="form-select" id="vision-enabled">
+                            <option value="true">Sim</option>
+                            <option value="false">Não</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Intervalo Auto-Captura (s)</label>
+                        <input type="number" class="form-input" id="vision-interval" value="20" min="0" max="120">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveSection('vision')">Salvar Visão</button>
+            </div>
+
+            <!-- Memory -->
+            <div class="card" id="card-memory">
+                <div class="card-title">
+                    <div class="card-icon purple">💾</div>
+                    Memória
+                </div>
+                <p class="card-description">Memória de longo prazo (ChromaDB).</p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Backend</label>
+                        <select class="form-select" id="memory-backend">
+                            <option value="chromadb">ChromaDB</option>
+                            <option value="letta">Letta (MemGPT)</option>
+                            <option value="none">Desativado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Embedding Model</label>
+                        <input type="text" class="form-input" id="memory-embedding" value="all-MiniLM-L6-v2">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" onclick="saveSection('memory')">Salvar Memória</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Panel: Personas ── -->
+    <section class="panel" id="panel-personas">
+        <div class="panel-header">
+            <h1 class="panel-title">🎭 Gerenciamento de Personas</h1>
+            <p class="panel-subtitle">Gerencie perfis de personagem. Faça upload de novos arquivos YAML ou troque a persona ativa.</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="card-icon pink">📤</div>
+                Upload de Persona
+            </div>
+            <p class="card-description">Envie um arquivo .yaml com o perfil de personagem.</p>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <input type="file" id="personaFile" accept=".yaml,.yml" style="color: var(--text-secondary); font-size: 13px;">
+                <button class="btn btn-secondary btn-sm" onclick="uploadPersona()">Upload</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <div class="card-icon purple">📋</div>
+                Personas Disponíveis
+            </div>
+            <p class="card-description">Clique em "Ativar" para trocar a persona no config.yaml.</p>
+            <div id="personasList">
+                <p style="color: var(--text-muted); font-size: 13px;">Carregando personas...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Panel: API Keys ── -->
+    <section class="panel" id="panel-keys">
+        <div class="panel-header">
+            <h1 class="panel-title">🔑 Gerenciamento de API Keys</h1>
+            <p class="panel-subtitle">Configure suas chaves de API. As chaves são salvas no arquivo .env local.</p>
+        </div>
+
+        <div class="card">
+            <div id="keysList">
+                <p style="color: var(--text-muted); font-size: 13px;">Carregando chaves...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Panel: Status ── -->
+    <section class="panel" id="panel-about">
+        <div class="panel-header">
+            <h1 class="panel-title">📊 Status do Sistema</h1>
+            <p class="panel-subtitle">Informações sobre o estado atual do AkaneDen.</p>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">
+                    <div class="card-icon green">✅</div>
+                    Sistema
+                </div>
+                <div id="systemStatus">
+                    <p style="color: var(--text-muted); font-size: 13px;">Carregando...</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">
+                    <div class="card-icon amber">📝</div>
+                    Sobre
+                </div>
+                <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.8;">
+                    <strong>AkaneDen v3.0</strong> — Shogun Async Architecture<br>
+                    "Não é como se eu quisesse te ajudar..."<br><br>
+                    Este painel gerencia configurações, personas e API keys.<br>
+                    O VTube Studio continua sendo a interface de avatar.
+                </p>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- ═══ Toast ═══ -->
+<div class="toast" id="toast"></div>
+
+<script>
+    // ═══════════════════════════════════════════
+    // AkaneDen Dashboard — Client Logic
+    // ═══════════════════════════════════════════
+
+    const API = '';  // Same origin
+
+    // ── Tab Navigation ──
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(`panel-${tab.dataset.panel}`).classList.add('active');
+        });
+    });
+
+    // ── Slider Sync ──
+    function syncSlider(sliderId, displayId, fixed = 1) {
+        const slider = document.getElementById(sliderId);
+        const display = document.getElementById(displayId);
+        if (slider && display) {
+            slider.addEventListener('input', () => {
+                display.textContent = parseFloat(slider.value).toFixed(fixed);
+            });
+        }
+    }
+
+    syncSlider('brain-temperature', 'brain-temperature-val', 1);
+    syncSlider('tts-emotion-threshold', 'tts-emotion-val', 2);
+    syncSlider('vad-threshold', 'vad-threshold-val', 2);
+
+    // ── Toast ──
+    function showToast(message, isError = false) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast show${isError ? ' error' : ''}`;
+        setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    // ── Load Config ──
+    async function loadConfig() {
+        try {
+            const res = await fetch(`${API}/api/config`);
+            const data = await res.json();
+            const c = data.akane || {};
+
+            // Brain
+            if (c.brain) {
+                setValue('brain-provider', c.brain.provider);
+                setSlider('brain-temperature', 'brain-temperature-val', c.brain.temperature, 1);
+                setValue('brain-max-history', c.brain.max_history);
+            }
+
+            // TTS
+            if (c.tts) {
+                setValue('tts-engine', c.tts.default_engine);
+                setValue('tts-edge-voice', c.tts.edge_voice);
+                setValue('tts-elevenlabs-id', c.tts.elevenlabs_voice_id);
+                setSlider('tts-emotion-threshold', 'tts-emotion-val', c.tts.emotion_threshold, 2);
+            }
+
+            // ASR
+            if (c.asr) {
+                setValue('asr-provider', c.asr.provider);
+                setValue('asr-model-size', c.asr.model_size);
+                setValue('asr-device', c.asr.device);
+                setValue('asr-language', c.asr.language);
+            }
+
+            // Input
+            setValue('input-mode', c.input_mode || 'ptt');
+            setValue('ptt-key', c.ptt_key || 'f2');
+
+            // VAD
+            if (c.vad) {
+                setSlider('vad-threshold', 'vad-threshold-val', c.vad.threshold || 0.5, 2);
+            }
+
+            // Vision
+            if (c.vision) {
+                setValue('vision-enabled', String(c.vision.enabled));
+                setValue('vision-interval', c.vision.auto_capture_interval);
+            }
+
+            // Memory
+            if (c.memory) {
+                setValue('memory-backend', c.memory.backend);
+                setValue('memory-embedding', c.memory.embedding_model);
+            }
+        } catch (err) {
+            showToast('Erro ao carregar config: ' + err.message, true);
+        }
+    }
+
+    function setValue(id, val) {
+        const el = document.getElementById(id);
+        if (el && val !== undefined && val !== null) el.value = val;
+    }
+
+    function setSlider(sliderId, displayId, val, fixed) {
+        const slider = document.getElementById(sliderId);
+        const display = document.getElementById(displayId);
+        if (slider && val !== undefined) {
+            slider.value = val;
+            if (display) display.textContent = parseFloat(val).toFixed(fixed);
+        }
+    }
+
+    // ── Save Section ──
+    async function saveSection(section) {
+        let data = {};
+
+        switch (section) {
+            case 'brain':
+                data = {
+                    provider: document.getElementById('brain-provider').value,
+                    temperature: parseFloat(document.getElementById('brain-temperature').value),
+                    max_history: parseInt(document.getElementById('brain-max-history').value),
+                };
+                break;
+            case 'tts':
+                data = {
+                    default_engine: document.getElementById('tts-engine').value,
+                    edge_voice: document.getElementById('tts-edge-voice').value,
+                    elevenlabs_voice_id: document.getElementById('tts-elevenlabs-id').value,
+                    emotion_threshold: parseFloat(document.getElementById('tts-emotion-threshold').value),
+                };
+                break;
+            case 'asr':
+                data = {
+                    provider: document.getElementById('asr-provider').value,
+                    model_size: document.getElementById('asr-model-size').value,
+                    device: document.getElementById('asr-device').value,
+                    language: document.getElementById('asr-language').value,
+                };
+                break;
+            case 'vision':
+                data = {
+                    enabled: document.getElementById('vision-enabled').value === 'true',
+                    auto_capture_interval: parseInt(document.getElementById('vision-interval').value),
+                };
+                break;
+            case 'memory':
+                data = {
+                    backend: document.getElementById('memory-backend').value,
+                    embedding_model: document.getElementById('memory-embedding').value,
+                };
+                break;
+        }
+
+        try {
+            const res = await fetch(`${API}/api/config`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ section, data }),
+            });
+            const result = await res.json();
+            showToast(`✅ ${section.toUpperCase()} salvo com sucesso!`);
+        } catch (err) {
+            showToast('Erro ao salvar: ' + err.message, true);
+        }
+    }
+
+    async function saveInputConfig() {
+        try {
+            const mode = document.getElementById('input-mode').value;
+            const key = document.getElementById('ptt-key').value;
+            const threshold = parseFloat(document.getElementById('vad-threshold').value);
+
+            // Save root-level input fields
+            const res1 = await fetch(`${API}/api/config/full`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    akane: {
+                        ...await (await fetch(`${API}/api/config`)).json().then(d => d.akane),
+                        input_mode: mode,
+                        ptt_key: key,
+                        vad: { enabled: mode === 'vad', provider: 'silero', threshold },
+                    }
+                }),
+            });
+
+            showToast('✅ Input config salvo!');
+        } catch (err) {
+            showToast('Erro: ' + err.message, true);
+        }
+    }
+
+    // ── Personas ──
+    async function loadPersonas() {
+        try {
+            const res = await fetch(`${API}/api/personas`);
+            const personas = await res.json();
+            const configRes = await fetch(`${API}/api/config`);
+            const config = await configRes.json();
+            const activePersona = config?.akane?.persona || '';
+
+            const container = document.getElementById('personasList');
+            if (personas.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Nenhuma persona encontrada.</p>';
+                return;
+            }
+
+            container.innerHTML = personas.map(p => `
+                <div class="persona-card ${p.name === activePersona || p.filename.replace('.yaml','') === activePersona ? 'active-persona' : ''}">
+                    <div class="persona-info">
+                        <h4>${p.name || p.filename}</h4>
+                        <p>${p.archetype || ''} ${p.description ? '— ' + p.description : ''}</p>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="switchPersona('${p.filename.replace('.yaml','')}')">Ativar</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            showToast('Erro ao carregar personas: ' + err.message, true);
+        }
+    }
+
+    async function switchPersona(name) {
+        try {
+            await fetch(`${API}/api/personas/switch/${name}`, { method: 'PUT' });
+            showToast(`🎭 Persona trocada para: ${name}`);
+            loadPersonas();
+        } catch (err) {
+            showToast('Erro: ' + err.message, true);
+        }
+    }
+
+    async function uploadPersona() {
+        const fileInput = document.getElementById('personaFile');
+        if (!fileInput.files.length) {
+            showToast('Selecione um arquivo .yaml primeiro!', true);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch(`${API}/api/personas/upload`, { method: 'POST', body: formData });
+            const result = await res.json();
+            if (res.ok) {
+                showToast(`📤 Persona '${result.filename}' enviada com sucesso!`);
+                loadPersonas();
+            } else {
+                showToast(result.detail || 'Erro no upload', true);
+            }
+        } catch (err) {
+            showToast('Erro: ' + err.message, true);
+        }
+    }
+
+    // ── API Keys ──
+    async function loadKeys() {
+        try {
+            const res = await fetch(`${API}/api/keys`);
+            const keys = await res.json();
+            const container = document.getElementById('keysList');
+
+            container.innerHTML = Object.entries(keys).map(([name, val]) => `
+                <div class="key-row">
+                    <span class="key-name">${name}</span>
+                    <span class="key-status ${val ? 'set' : 'unset'}">${val ? '✓ ' + val : '✗ Não configurada'}</span>
+                    <input type="password" class="key-input" id="key-${name}" placeholder="Nova chave...">
+                    <button class="btn btn-secondary btn-sm" onclick="saveKey('${name}')">Salvar</button>
+                </div>
+            `).join('');
+        } catch (err) {
+            showToast('Erro ao carregar keys: ' + err.message, true);
+        }
+    }
+
+    async function saveKey(keyName) {
+        const input = document.getElementById(`key-${keyName}`);
+        const value = input.value.trim();
+        if (!value) {
+            showToast('Digite a chave antes de salvar!', true);
+            return;
+        }
+
+        try {
+            await fetch(`${API}/api/keys`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key_name: keyName, key_value: value }),
+            });
+            showToast(`🔑 ${keyName} atualizada!`);
+            input.value = '';
+            loadKeys();
+        } catch (err) {
+            showToast('Erro: ' + err.message, true);
+        }
+    }
+
+    // ── Status ──
+    async function loadStatus() {
+        try {
+            const res = await fetch(`${API}/api/status`);
+            const status = await res.json();
+            document.getElementById('systemStatus').innerHTML = `
+                <div style="font-size:14px; line-height: 2;">
+                    <div><strong>Status:</strong> <span style="color:var(--accent-green)">● ${status.status}</span></div>
+                    <div><strong>Versão:</strong> ${status.version}</div>
+                    <div><strong>Config:</strong> <code style="font-size:12px; color:var(--text-secondary)">${status.config_path}</code></div>
+                    <div><strong>Personas:</strong> <code style="font-size:12px; color:var(--text-secondary)">${status.personas_dir}</code></div>
+                </div>
+            `;
+        } catch (err) {
+            document.getElementById('systemStatus').innerHTML = `
+                <p style="color:var(--accent-red)">⚠️ Servidor não alcançável. Verifique se o dashboard está rodando.</p>
+            `;
+        }
+    }
+
+    // ── Logs SSE ──
+    function setupLogs() {
+        const source = new EventSource(`${API}/api/logs/stream`);
+        const container = document.getElementById('logs-container');
+        
+        source.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                const el = document.createElement('div');
+                el.style.marginBottom = '4px';
+                el.style.borderBottom = '1px solid #222';
+                el.style.paddingBottom = '4px';
+                
+                let color = '#ccc';
+                if (data.level === 'ERROR') color = '#ff4d4d';
+                else if (data.level === 'WARNING') color = '#ffa64d';
+                else if (data.level === 'SUCCESS') color = '#4dffa6';
+                else if (data.level === 'DEBUG') color = '#888';
+                
+                el.innerHTML = `<span style="color:#666">[${data.time}]</span> <strong style="color:${color}">${data.level}</strong>: ${data.message}`;
+                
+                container.appendChild(el);
+                
+                // Auto-scroll to bottom
+                if (container.scrollHeight - container.scrollTop < container.clientHeight + 100) {
+                    container.scrollTop = container.scrollHeight;
+                }
+                
+                // Keep max 500 lines to avoid DOM lag
+                if (container.childElementCount > 500) {
+                    container.removeChild(container.firstChild);
+                }
+            } catch(e) {}
+        };
+        
+        source.onerror = function(err) {
+            console.error("EventSource failed:", err);
+            source.close();
+            setTimeout(setupLogs, 5000); // Reconnect loop
+        }
+    }
+
+    // ── Init ──
+    loadConfig();
+    loadPersonas();
+    loadKeys();
+    loadStatus();
+    setupLogs();
+</script>
+</body>
+</html>

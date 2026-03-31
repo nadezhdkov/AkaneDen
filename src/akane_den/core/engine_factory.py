@@ -18,6 +18,7 @@ from loguru import logger
 from akane_den.core.config import AkaneConfig
 from akane_den.core.engines.asr_engine import (
     ASREngine,
+    GroqWhisperASREngine,
     SherpaOnnxASREngine,
     WhisperASREngine,
 )
@@ -57,6 +58,7 @@ class EngineFactory:
     _ASR_REGISTRY: dict[str, type[ASREngine]] = {
         "whisper": WhisperASREngine,
         "sherpa": SherpaOnnxASREngine,
+        "groq_whisper": GroqWhisperASREngine,
     }
 
     # ── Registro dinâmico ──
@@ -141,3 +143,24 @@ class EngineFactory:
             "tts": list(cls._TTS_REGISTRY.keys()),
             "asr": list(cls._ASR_REGISTRY.keys()),
         }
+
+    # ── VAD Factory ──
+
+    @classmethod
+    def create_vad(cls, config: AkaneConfig):
+        """Cria VAD engine se habilitado no config.
+
+        Retorna None se VAD está desativado.
+        """
+        if not config.vad.enabled:
+            logger.info("VAD desativado (modo PTT primário).")
+            return None
+
+        from akane_den.core.engines.vad_engine import SileroVADEngine
+
+        provider = config.vad.provider
+        if provider == "silero":
+            logger.info("Criando VAD: silero")
+            return SileroVADEngine(config)
+
+        raise ValueError(f"VAD provider '{provider}' não suportado!")

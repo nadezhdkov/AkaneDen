@@ -1,5 +1,5 @@
 # ============================================================
-# Akane Den — Configuração Central (Arquitetura Shogun v3.0)
+# Akane Den — Configuração Central (Arquitetura Shogun v3.5)
 # ============================================================
 # "Não mexa nesse arquivo sem minha permissão, baka!" — Akane
 #
@@ -115,56 +115,73 @@ akane:
 
   # --- Speech-to-Text (ASR) ---
   asr:
-    provider: "whisper" # "whisper" ou "sherpa"
-    model_size: "medium" # tiny, small, medium, large
+    provider: "whisper" # "whisper", "sherpa", ou "groq_whisper"
+    model_size: "small" # tiny, small, medium, large
     device: "cpu" # cpu ou cuda
     language: "pt"
+    # Groq Whisper (API) — se provider="groq_whisper"
+    # groq_whisper_model: "whisper-large-v3-turbo"
     # Sherpa-onnx (SenseVoiceSmall int8) — se provider="sherpa"
-    # sherpa_model_path: "models/sensevoice-small.onnx"
-    # sherpa_tokens_path: "models/tokens.txt"
+    # sherpa_model_path: "models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx"
+    # sherpa_tokens_path: "models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt"
 
   # --- Text-to-Speech (Motor Híbrido) ---
   tts:
-    default_engine: "edge" # "edge", "elevenlabs", ou "sherpa"
-    edge_voice: "pt-BR-ThalitaNeural"
-    edge_pitch: "+12Hz"
+    default_engine: "edge" # "edge" (grátis), "elevenlabs" (requer plano pago)
+    edge_voice: "pt-BR-ThalitaNeural" # "pt-BR-ThalitaNeural" ou "pt-BR-AntonioNeural" ou "en-US-AnaNeural" ou "en-US-AriaNeural"
+    edge_pitch: "+15Hz"
     edge_rate: "+10%"
-    elevenlabs_voice_id: "MEJe6hPrI48Kt2lFuVe3" # Yumi (feminina)
+    elevenlabs_voice_id: "AZnzlk1XvdvUeBnXmlld" # Yumi (feminina)
     elevenlabs_model: "eleven_flash_v2_5"
     emotion_threshold: 0.7 # Score mínimo para ativar ElevenLabs
 
   # --- Visão / Consciência Ambiental ---
   vision:
     enabled: true
-    auto_capture_interval: 0 # Segundos entre capturas (0=desabilitado)
+    provider: "ollama" # "gemini" ou "ollama"
+    auto_capture_interval: 120 # Segundos entre capturas (CPU: mínimo 60s)
+
+    # Gemini (se provider="gemini")
     gemini_model: "gemini-2.5-flash"
+
+    # Ollama (se provider="ollama")
+    vision_model: "moondream" # "llama3.2-vision" (default, OCR) ou "moondream" (rápido)
+    ollama_base_url: "http://localhost:11434"
 
   # --- VTube Studio ---
   vtube:
     port: 8001
     mouse_tracking: true
-    mouse_sensitivity: 1.0
+    mouse_sensitivity: 1.2
     lip_sync: true
-    lip_sensitivity: 1.5
-    lip_smoothing: 0.4
+    lip_sensitivity: 1.8
+    lip_smoothing: 0.3
 
   # --- Cérebro (LLM) ---
+  # ┌──────────────────────────────────────────────────┐
+  # │ SETUP GRATUITO PARA TESTE:                       │
+  # │  • gemini  → Free tier (GOOGLE_API_KEY no .env)  │
+  # │  • groq    → Free tier (GROQ_API_KEY no .env)    │
+  # │  • ollama  → Grátis local (requer servidor)      │
+  # │  • openai  → Pago (requer OPENAI_API_KEY)        │
+  # └──────────────────────────────────────────────────┘
   brain:
-    provider: "gemini" # "gemini", "groq", "ollama", "openai"
-    temperature: 0.7
-    max_history: 50
+    provider: "ollama" # "gemini", "groq", "ollama", "openai"
+    temperature: 0.8
+    max_history: 10 # Turnos mantidos no prompt
 
-    # Gemini (default)
-    gemini_model: "gemini-2.5-flash"
+    # GROQ
+    groq_model: "qwen-2.5-32b"
+    groq_temperature: 0.7
+    groq_max_tokens: 1024
 
-    # Groq (alternativo — requer GROQ_API_KEY)
-    # groq_model: "llama-3.3-70b-versatile"
+    # OLLAMA
+    ollama_model: "llama3.2"
+    ollama_temperature: 0.7
+    ollama_max_tokens: 500
+    ollama_base_url: "http://localhost:11434"
 
-    # Ollama (local — requer servidor rodando)
-    # ollama_model: "llama3.2"
-    # ollama_base_url: "http://localhost:11434"
-
-    # OpenAI (alternativo — requer OPENAI_API_KEY)
+    # OpenAI (alternativo — requer OPENAI_API_KEY + plano pago)
     # openai_model: "gpt-4o-mini"
 
   # --- Memória de Longo Prazo ---
@@ -185,3 +202,30 @@ akane:
       - "duckduckgo_search" # Pesquisa web em tempo real
       - "stagehand" # Navegação e leitura de páginas
       - "image_generation" # Geração de imagens (thumbnails, assets)
+
+  # --- VAD (Voice Activity Detection) ---
+  # DESATIVADO por padrão. PTT (F2) é o modo primário.
+  # Ative apenas se quiser modo hands-free.
+  vad:
+    enabled: false
+    provider: "silero" # "silero" (único por enquanto)
+    threshold: 0.5 # Sensibilidade (0.1–0.9, menor = mais sensível)
+    min_speech_ms: 250 # Duração mínima de fala para trigger
+    min_silence_ms: 1000 # Silêncio mínimo para end-of-utterance
+
+  # --- Web Dashboard (Painel de Controle) ---
+  # Dashboard web para gerenciar config, personas e API keys.
+  # NÃO substitui o VTube Studio.
+  dashboard:
+    enabled: false # Ative para abrir o painel
+    host: "127.0.0.1" # Apenas local por segurança
+    port: 8080 # http://127.0.0.1:8080
+
+  # --- Twitch Integration (Fase 3) ---
+  # Requer gerar oauth token em https://twitchapps.com/tmi/ e colocar no .env (TWITCH_OAUTH_TOKEN)
+  # Ou definir oauth_token aqui diretamente se não usar .env.
+  twitch:
+    enabled: false
+    oauth_token: "" # Deixe em branco para usar TWITCH_OAUTH_TOKEN do .env
+    channel_name: "wisehope_" # O nome do seu canal (letras minúsculas)
+    cooldown: 15 # Segundos entre uma leitura e outra para não floodar o TTS

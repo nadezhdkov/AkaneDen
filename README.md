@@ -29,15 +29,17 @@ Esta versão consolida capacidades agentic de alto nível, permitindo que a IA n
 
 ## ✨ Features Principais
 
-- 🎙️ **Zero-Latency Async Loop:** O pipeline de áudio atômico transmite blocos sintetizados via Edge-TTS/ElevenLabs em paralelo enquanto a LLM continua gerando o stream de pensamento, garantindo interrupções zero.
-- 🎛️ **Web Dashboard UI (FastAPI):** Painel de controle integrado rodando em sidecar para *Hot-Swap* de Personas em tempo real, edição de configuração e consumo de logs via Server-Sent Events (SSE).
-- 📺 **Integração Twitch (Live):** Integração out-of-the-box com `twitchio` para monitoramento assíncrono e resposta orgânica ao chat da plataforma.
-- 🔔 **Agente Proativo (Proactive Speaking):** Monitoramento assíncrono do ambiente. Akane engaja na conversa de forma proativa se detectar um longo período de ausência/silêncio.
-- 🧠 **Multi-Engine Brain:** Arquitetura agnóstica de LLM suportando Google Gemini (Padrão), Groq (Modelos open-source rápidos via API), Ollama (Local) e OpenAI GPT.
-- 🛠️ **MCP Tools Integradas:** Acesso em tempo real ao DuckDuckGo Search, navegação/scrapping web avançada via `stagehand`, além de visão e controle granular do sistema host.
-- 👁️ **Visão Multimodal (Zero-Latency):** Leitura simultânea da tela (Desktop) e Webcam capturados silenciosamente em background para contextualização imediata da voz do usuário.
-- 🤯 **Memória de Longo Prazo em Tiers:** Gestão avançada de memória com SQLite (Working tier - Chat History contínuo) e ChromaDB (Episodic/Semantic tier) para recuperação não-temporal.
-- 🖱️ **Comunicação VTube Bidirecional:** Tracking de mouse de desktop para apontamento analógico de retina, lip-sync nativo extraindo picos de áudio e mudanças autônomas de expressão com base em sentimentos inferidos.
+| Feature | Descrição |
+|--------|----------|
+| 🎙️ **Zero-Latency Async Loop** | O pipeline de áudio atômico transmite blocos sintetizados via Edge-TTS/ElevenLabs em paralelo enquanto a LLM continua gerando o stream de pensamento, garantindo interrupções zero. |
+| 🎛️ **Web Dashboard UI (FastAPI)** | Painel de controle integrado rodando em sidecar para *Hot-Swap* de Personas em tempo real, edição de configuração e consumo de logs via Server-Sent Events (SSE). |
+| 📺 **Integração Twitch (Live)** | Integração out-of-the-box com `twitchio` para monitoramento assíncrono e resposta orgânica ao chat da plataforma. |
+| 🔔 **Agente Proativo (Proactive Speaking)** | Monitoramento assíncrono do ambiente. Akane engaja na conversa de forma proativa se detectar um longo período de ausência/silêncio. |
+| 🧠 **Multi-Engine Brain** | Arquitetura agnóstica de LLM suportando Google Gemini (Padrão), Groq (Modelos open-source rápidos via API), Ollama (Local) e OpenAI GPT. |
+| 🛠️ **MCP Tools Integradas** | Acesso em tempo real ao DuckDuckGo Search, navegação/scrapping web avançada via `stagehand`, além de visão e controle granular do sistema host. |
+| 👁️ **Visão Multimodal (Zero-Latency)** | Leitura simultânea da tela (Desktop) e Webcam capturados silenciosamente em background para contextualização imediata da voz do usuário. |
+| 🤯 **Memória de Longo Prazo em Tiers** | Gestão avançada de memória com SQLite (Working tier - Chat History contínuo) e ChromaDB (Episodic/Semantic tier) para recuperação não-temporal. |
+| 🖱️ **Comunicação VTube Bidirecional** | Tracking de mouse de desktop para apontamento analógico de retina, lip-sync nativo extraindo picos de áudio e mudanças autônomas de expressão com base em sentimentos inferidos. |
 
 ---
 
@@ -188,7 +190,7 @@ python -m akane_den.main
 ---
 
 ## 🛡️ Licença
-Mantenha a segurança e integridade do código. Distribuído de forma proprietária/aberta sob a Licença deste Repositório. Consulte o arquivo `LICENSE` para mais detalhes.
+Mantenha a segurança e integridade do código. Distribuído de forma proprietária/aberta sob a Licença deste Repositório. Consulte o arquivo [`LICENSE`](https://github.com/nadezhdkov/AkaneDen/blob/main/LICENSE) para mais detalhes.
 
 <p align="center">
   <em>"Escrevi este arquivo de introdução de forma detalhada para você entender de uma vez por todas. Considere isso como um guia de sobrevivência, idiota!" — Akane</em>

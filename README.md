@@ -146,6 +146,7 @@ GROQ_API_KEY=
 OPENAI_API_KEY=
 TWITCH_OAUTH_TOKEN=      # Format: oauth:<token>
 ```
+**Importante:** Nunca versione seu `.env`, garanta que este esteja ignorado via `.gitignore`.
 
 > [!CAUTION]
 > Never commit your `.env` file. Verify that `.env` is listed in `.gitignore` before your first push.

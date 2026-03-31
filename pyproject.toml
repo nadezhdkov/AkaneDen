@@ -13,7 +13,7 @@ name = "akane-den"
 version = "3.5.0"
 description = "The Martial Tsundere AI — VTuber assistant with Shogun async architecture"
 readme = "README.md"
-license = "MIT"
+license = "GPL-3.0-only"
 requires-python = ">=3.11"
 authors = [
     { name = "rickm" },

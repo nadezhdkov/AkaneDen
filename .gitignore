@@ -15,7 +15,9 @@ vts_token*.txt
 *.pfx
 
 # ===== Modelos & Binários Pesados =====
-models/
+# ATENÇÃO: /models/ (com /) só ignora o diretório na RAIZ do projeto (binários ML).
+# NÃO usar "models/" sem a barra inicial — isso bloqueia src/akane_den/core/models/ também!
+/models/
 *.tar.bz2
 *.tar.gz
 *.zip

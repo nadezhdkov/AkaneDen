@@ -413,7 +413,7 @@ def take_screenshot() -> str:
         Caminho do arquivo do screenshot.
     """
     try:
-        from PIL import ImageGrab
+        import sys
         import time
         from pathlib import Path
         from akane_den.core.paths import BASE_DIR
@@ -422,7 +422,45 @@ def take_screenshot() -> str:
         out_dir.mkdir(parents=True, exist_ok=True)
         timestamp = int(time.time())
         path = out_dir / f"screen_{timestamp}.png"
-        img = ImageGrab.grab()
+
+        img = None
+
+        # Tenta ImageGrab primeiro (Windows/macOS, Linux com scrot via Pillow)
+        try:
+            from PIL import ImageGrab
+            img = ImageGrab.grab()
+        except Exception:
+            img = None
+
+        # Fallback Linux: subprocess + scrot
+        if img is None and sys.platform == "linux":
+            import subprocess
+            import tempfile
+            try:
+                with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                    tmp_path = tmp.name
+                subprocess.run(
+                    ["scrot", "-o", tmp_path],
+                    check=True,
+                    timeout=10,
+                    capture_output=True,
+                )
+                from PIL import Image
+                img = Image.open(tmp_path)
+                img.load()
+                import os as _os
+                _os.unlink(tmp_path)
+            except FileNotFoundError:
+                return (
+                    "Screenshot impossível no Linux: instale scrot "
+                    "(sudo apt install scrot) ou gnome-screenshot."
+                )
+            except subprocess.SubprocessError as e:
+                return f"Falha ao capturar tela via scrot: {e}"
+
+        if img is None:
+            return "Nenhum método de captura de tela disponível neste sistema."
+
         img.save(str(path))
         return f"Screenshot salvo: {path}"
     except Exception as e:

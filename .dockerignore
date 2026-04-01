@@ -8,7 +8,7 @@ env/
 local_chroma_db/
 chat_history/
 logs/
-models/
+/models/
 screenshots/
 generated_images/
 

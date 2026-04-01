@@ -159,12 +159,47 @@ class ScreenVisionSkill(BaseSkill):
 
         # Captura screenshot e converte em thread para não bloquear o event loop
         def _capture_and_encode():
-            from PIL import ImageGrab
-            import io
-            screenshot = ImageGrab.grab()
+            import sys as _sys
+            img = None
+
+            # Tenta ImageGrab primeiro (Windows/macOS nativo, Linux com scrot instalado)
+            try:
+                from PIL import ImageGrab
+                img = ImageGrab.grab()
+            except Exception:
+                img = None
+
+            # Fallback Linux: subprocess + scrot
+            if img is None and _sys.platform == "linux":
+                import subprocess
+                import tempfile
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                        tmp_path = tmp.name
+                    subprocess.run(
+                        ["scrot", "-o", tmp_path],
+                        check=True,
+                        timeout=10,
+                        capture_output=True,
+                    )
+                    from PIL import Image
+                    img = Image.open(tmp_path)
+                    img.load()  # garante que a imagem é lida antes de deletar
+                    import os as _os
+                    _os.unlink(tmp_path)
+                except FileNotFoundError:
+                    raise RuntimeError(
+                        "Screenshot impossível no Linux: instale scrot "
+                        "(sudo apt install scrot) ou gnome-screenshot."
+                    )
+                except subprocess.SubprocessError as e:
+                    raise RuntimeError(f"Falha ao capturar tela via scrot: {e}")
+
+            if img is None:
+                raise RuntimeError("Nenhum método de captura de tela disponível.")
             
             max_size = 768
-            width, height = screenshot.size
+            width, height = img.size
             if max(width, height) > max_size:
                 if width > height:
                     new_w = max_size
@@ -172,10 +207,10 @@ class ScreenVisionSkill(BaseSkill):
                 else:
                     new_h = max_size
                     new_w = int(max_size * width / height)
-                screenshot = screenshot.resize((new_w, new_h))
+                img = img.resize((new_w, new_h))
 
             buf = io.BytesIO()
-            screenshot.save(buf, format="PNG", optimize=False)
+            img.save(buf, format="PNG", optimize=False)
             return buf.getvalue()
 
         self._inference_running = True

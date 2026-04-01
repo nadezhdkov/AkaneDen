@@ -70,10 +70,14 @@ class BrainConfig(BaseModel):
     # Groq settings
     groq_model: str = "llama-3.3-70b-versatile"
     groq_api_base: str = ""
+    groq_temperature: float = Field(0.7, ge=0.0, le=2.0)
+    groq_max_tokens: int = Field(1024, ge=1, le=32768)
 
     # Ollama settings
     ollama_model: str = "llama3.2"
     ollama_base_url: str = "http://localhost:11434"
+    ollama_temperature: float = Field(0.7, ge=0.0, le=2.0)
+    ollama_max_tokens: int = Field(500, ge=1, le=32768)
 
     # OpenAI settings
     openai_model: str = "gpt-4o-mini"
